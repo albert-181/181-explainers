@@ -1,1 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel data, one bit at a time</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --black:#000000;
+    --white:#ffffff;
+    --blue:#000080;
+    --red:#e02020;
+    --green:#00a03c;
+    --bluech:#1050e0;
+    --display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
+    --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--white)}
+  body{font-family:var(--body);color:var(--black);-webkit-font-smoothing:antialiased}
 
+  .wrap{max-width:1060px;margin:0 auto;padding:18px 24px 22px}
+
+  .top{display:flex;justify-content:flex-end;align-items:flex-start;gap:20px;flex-wrap:wrap}
+  .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;line-height:1.6}
+  h1{
+    font-family:var(--display);font-weight:500;
+    font-size:clamp(28px,4.4vw,54px);line-height:1;letter-spacing:-.03em;margin:10px 0 12px;
+  }
+  .lede{font-size:clamp(13px,1.25vw,17px);line-height:1.5;max-width:66ch}
+  .rule{height:2px;background:var(--black);margin:18px 0 4px}
+  .rule.thin{height:1px;opacity:.22;margin:16px 0}
+
+  /* mode toggle */
+  .seg{display:inline-flex;border:2px solid var(--black);flex:0 0 auto}
+  .seg button{
+    font-family:var(--body);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    padding:9px 15px;background:var(--white);color:var(--black);border:0;cursor:pointer;line-height:1;
+  }
+  .seg button + button{border-left:2px solid var(--black)}
+  .seg button.on{background:var(--black);color:var(--white)}
+
+  svg.wave{display:block;width:100%;height:auto}
+  .cell-line{stroke:var(--black);stroke-width:1;opacity:.12}
+  .grp-line{stroke:var(--black);stroke-width:1;opacity:.38}
+  .fill{fill:var(--blue);opacity:0;transition:opacity .16s linear}
+  .bit{font-family:var(--display);font-weight:500;font-size:15px;fill:var(--black);text-anchor:middle;opacity:0;transition:opacity .16s linear}
+  .trace{fill:none;stroke:var(--black);stroke-width:3;stroke-linejoin:miter;stroke-linecap:square}
+  .grp-rule{stroke-width:3}
+  .grp-label{font-family:var(--body);font-size:12px;letter-spacing:.2em;text-anchor:middle}
+
+  .lower{display:flex;flex-wrap:wrap;gap:22px 28px;align-items:flex-start;margin-top:4px}
+  .chips{display:flex;gap:14px;flex:1 1 440px;min-width:300px}
+  .chip{flex:1 1 0;border-top:3px solid var(--black);padding-top:8px;opacity:.22;transition:opacity .3s linear}
+  .chip.on{opacity:1}
+  .chip .ch{font-size:10px;letter-spacing:.2em;text-transform:uppercase;line-height:1.6}
+  .chip .bin{font-family:var(--display);font-weight:500;font-size:clamp(13px,1.6vw,20px);letter-spacing:.08em;line-height:1.5;white-space:nowrap}
+  .chip .dec{font-family:var(--display);font-weight:500;font-size:clamp(24px,3.2vw,40px);line-height:1;letter-spacing:-.02em}
+
+  .slider{display:none;margin-top:12px}
+  .chips.manual .slider{display:block}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:16px;background:transparent;cursor:pointer;display:block}
+  input[type=range]:focus{outline:none}
+  input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--black)}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:12px;height:16px;margin-top:-7px;
+    background:var(--c);border:2px solid var(--black);border-radius:0;
+  }
+  input[type=range]::-moz-range-track{height:2px;background:var(--black)}
+  input[type=range]::-moz-range-thumb{
+    width:10px;height:14px;background:var(--c);border:2px solid var(--black);border-radius:0;
+  }
+
+  .pixelbox{display:flex;align-items:center;gap:16px;flex:0 0 auto;padding-top:4px}
+  .pixel{width:118px;height:118px;background:#0d0d0d;position:relative;flex:0 0 auto}
+  .emit{position:absolute;inset:15px;background:#0d0d0d;transition:background .4s linear,box-shadow .4s linear}
+  .pixelbox .cap{font-size:10px;letter-spacing:.2em;text-transform:uppercase;line-height:1.7;max-width:110px}
+
+  .result{
+    font-family:var(--display);font-weight:500;
+    font-size:clamp(20px,2.6vw,34px);line-height:1.05;letter-spacing:-.02em;
+  }
+
+  @media (max-width:700px){
+    .wrap{padding:18px 16px}
+    .bit{font-size:22px}
+    .grp-label{font-size:18px}
+    .lower{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="seg" role="group" aria-label="Mode">
+      <button type="button" id="btn-auto" class="on">Auto scroll</button>
+      <button type="button" id="btn-man">Pick a color</button>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <svg class="wave" id="wave" viewBox="0 0 1150 206" role="img"
+       aria-label="Twenty four pulses, eight per color channel, forming one pixel color"></svg>
+
+  <div class="rule thin"></div>
+
+  <div class="lower">
+    <div class="chips" id="chips">
+      <div class="chip" id="chip-r" style="border-top-color:var(--red)">
+        <div class="ch">Red</div><div class="bin" id="bin-r">00000000</div><div class="dec" id="dec-r">0</div>
+        <div class="slider"><input type="range" id="sl-r" min="0" max="255" value="181" style="--c:var(--red)" aria-label="Red value"></div>
+      </div>
+      <div class="chip" id="chip-g" style="border-top-color:var(--green)">
+        <div class="ch">Green</div><div class="bin" id="bin-g">00000000</div><div class="dec" id="dec-g">0</div>
+        <div class="slider"><input type="range" id="sl-g" min="0" max="255" value="92" style="--c:var(--green)" aria-label="Green value"></div>
+      </div>
+      <div class="chip" id="chip-b" style="border-top-color:var(--bluech)">
+        <div class="ch">Blue</div><div class="bin" id="bin-b">00000000</div><div class="dec" id="dec-b">0</div>
+        <div class="slider"><input type="range" id="sl-b" min="0" max="255" value="255" style="--c:var(--bluech)" aria-label="Blue value"></div>
+      </div>
+    </div>
+
+    <div class="pixelbox">
+      <div class="pixel"><div class="emit" id="emit"></div></div>
+      <div class="cap">One pixel<br>on the strip</div>
+    </div>
+  </div>
+
+  <div class="rule thin"></div>
+
+  <div class="result">24 bits per pixel. 256 levels per channel. 16.7 million colors.</div>
+
+</div>
+
+<script>
+(function(){
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var svg = document.getElementById("wave");
+
+  var X0 = 22, W = 46, N = 24;
+  var YL = 152, YH = 54;
+  var H1 = 34, H0 = 12;
+
+  var CH = [
+    {name:"RED",   color:"#e02020", bin:"bin-r", dec:"dec-r", chip:"chip-r", sl:"sl-r"},
+    {name:"GREEN", color:"#00a03c", bin:"bin-g", dec:"dec-g", chip:"chip-g", sl:"sl-g"},
+    {name:"BLUE",  color:"#1050e0", bin:"bin-b", dec:"dec-b", chip:"chip-b", sl:"sl-b"}
+  ];
+
+  var FRAMES = [
+    {r:181, g:92,  b:255},
+    {r:255, g:176, b:0},
+    {r:0,   g:190, b:160},
+    {r:255, g:40,  b:90},
+    {r:40,  g:120, b:255}
+  ];
+
+  function el(tag, attrs){
+    var n = document.createElementNS(SVGNS, tag);
+    for(var k in attrs){ n.setAttribute(k, attrs[k]); }
+    return n;
+  }
+  function toBits(v){
+    var s = v.toString(2);
+    while(s.length < 8){ s = "0" + s; }
+    return s;
+  }
+
+  // static frame
+  for(var i=0;i<=N;i++){
+    var x = X0 + W*i;
+    svg.appendChild(el("line", {x1:x, y1:44, x2:x, y2:162,
+      "class": (i%8===0 ? "grp-line" : "cell-line")}));
+  }
+  for(var g=0;g<3;g++){
+    var gx = X0 + W*8*g, gw = W*8;
+    svg.appendChild(el("line", {x1:gx+3, y1:176, x2:gx+gw-3, y2:176,
+      stroke:CH[g].color, "class":"grp-rule"}));
+    var t = el("text", {x:gx+gw/2, y:196, "class":"grp-label", fill:CH[g].color});
+    t.textContent = CH[g].name;
+    svg.appendChild(t);
+  }
+
+  var trace = el("path", {"class":"trace", pathLength:"1"});
+  svg.appendChild(trace);
+
+  var rects = [], texts = [];
+  for(var i=0;i<N;i++){
+    var r = el("rect", {"class":"fill", x:X0+W*i, y:YH, width:H1, height:YL-YH});
+    svg.appendChild(r); rects.push(r);
+    var tx = el("text", {"class":"bit", x:X0+W*i, y:38});
+    svg.appendChild(tx); texts.push(tx);
+  }
+
+  function layout(bitsStr){
+    var d = "M 0," + YL;
+    for(var i=0;i<N;i++){
+      var x = X0 + W*i;
+      var h = (bitsStr[i] === "1") ? H1 : H0;
+      d += " L " + x + "," + YL + " L " + x + "," + YH +
+           " L " + (x+h) + "," + YH + " L " + (x+h) + "," + YL;
+      rects[i].setAttribute("width", h);
+      texts[i].setAttribute("x", x + h/2);
+      texts[i].textContent = bitsStr[i];
+    }
+    d += " L 1150," + YL;
+    trace.setAttribute("d", d);
+  }
+
+  function sleep(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+
+  var emit = document.getElementById("emit");
+
+  function light(r,g,b){
+    emit.style.background = "rgb(" + r + "," + g + "," + b + ")";
+    emit.style.boxShadow = "0 0 46px 12px rgba(" + r + "," + g + "," + b + ",0.55)";
+  }
+  function showChip(idx, on){
+    document.getElementById(CH[idx].chip).classList.toggle("on", on);
+  }
+  function setChip(idx, bits, val){
+    document.getElementById(CH[idx].bin).textContent = bits;
+    document.getElementById(CH[idx].dec).textContent = val;
+  }
+
+  var BIT_MS = 125;
+  var mode = "auto";
+  var gen = 0;
+  var cur = {r:181, g:92, b:255};
+
+  function clearBits(){
+    for(var i=0;i<N;i++){
+      rects[i].style.transitionDelay = "0ms";
+      texts[i].style.transitionDelay = "0ms";
+      rects[i].style.opacity = 0;
+      texts[i].style.opacity = 0;
+    }
+  }
+  function allBitsOn(){
+    for(var i=0;i<N;i++){
+      rects[i].style.transitionDelay = "0ms";
+      texts[i].style.transitionDelay = "0ms";
+      rects[i].style.opacity = 1;
+      texts[i].style.opacity = 1;
+    }
+  }
+
+  // instant render, used by the manual mode
+  function renderNow(f){
+    cur = f;
+    var bR = toBits(f.r), bG = toBits(f.g), bB = toBits(f.b);
+    layout(bR + bG + bB);
+    setChip(0, bR, f.r); setChip(1, bG, f.g); setChip(2, bB, f.b);
+    trace.style.transition = "none";
+    trace.style.strokeDasharray = "none";
+    trace.style.strokeDashoffset = 0;
+    trace.style.opacity = 1;
+    allBitsOn();
+    for(var k=0;k<3;k++){ showChip(k,true); }
+    light(f.r, f.g, f.b);
+  }
+
+  async function play(f, myGen){
+    cur = f;
+    var bR = toBits(f.r), bG = toBits(f.g), bB = toBits(f.b);
+    layout(bR + bG + bB);
+    setChip(0, bR, f.r); setChip(1, bG, f.g); setChip(2, bB, f.b);
+
+    clearBits();
+    trace.style.transition = "none";
+    trace.style.strokeDasharray = 1;
+    trace.style.strokeDashoffset = 1;
+    trace.style.opacity = 1;
+    for(var k=0;k<3;k++){ showChip(k,false); }
+    emit.style.background = "#0d0d0d";
+    emit.style.boxShadow = "none";
+    void trace.getBoundingClientRect();
+
+    trace.style.transition = "stroke-dashoffset " + (N*BIT_MS) + "ms linear";
+    trace.style.strokeDashoffset = 0;
+    for(var i=0;i<N;i++){
+      rects[i].style.transitionDelay = (i*BIT_MS) + "ms";
+      texts[i].style.transitionDelay = (i*BIT_MS) + "ms";
+      rects[i].style.opacity = 1;
+      texts[i].style.opacity = 1;
+    }
+
+    await sleep(8*BIT_MS + 120); if(myGen !== gen) return;
+    showChip(0,true); light(f.r,0,0);
+    await sleep(8*BIT_MS);       if(myGen !== gen) return;
+    showChip(1,true); light(f.r,f.g,0);
+    await sleep(8*BIT_MS);       if(myGen !== gen) return;
+    showChip(2,true); light(f.r,f.g,f.b);
+
+    await sleep(2600);           if(myGen !== gen) return;
+
+    trace.style.transition = "opacity 450ms linear";
+    trace.style.opacity = 0;
+    clearBits();
+    await sleep(700);
+  }
+
+  async function autoLoop(myGen){
+    var i = 0;
+    while(myGen === gen){
+      await play(FRAMES[i % FRAMES.length], myGen);
+      i++;
+    }
+  }
+
+  // mode switching
+  var btnAuto = document.getElementById("btn-auto");
+  var btnMan  = document.getElementById("btn-man");
+  var chips   = document.getElementById("chips");
+  var sliders = [document.getElementById("sl-r"),
+                 document.getElementById("sl-g"),
+                 document.getElementById("sl-b")];
+
+  function readSliders(){
+    return {r:+sliders[0].value, g:+sliders[1].value, b:+sliders[2].value};
+  }
+  sliders.forEach(function(s){
+    s.addEventListener("input", function(){
+      if(mode !== "manual"){ return; }
+      renderNow(readSliders());
+    });
+  });
+
+  function setMode(m){
+    if(m === mode){ return; }
+    mode = m;
+    gen++;                               // cancels any running animation
+    btnAuto.classList.toggle("on", m === "auto");
+    btnMan.classList.toggle("on", m === "manual");
+    chips.classList.toggle("manual", m === "manual");
+
+    if(m === "manual"){
+      sliders[0].value = cur.r; sliders[1].value = cur.g; sliders[2].value = cur.b;
+      renderNow({r:cur.r, g:cur.g, b:cur.b});
+    } else {
+      trace.style.strokeDasharray = 1;
+      autoLoop(gen);
+    }
+  }
+  btnAuto.addEventListener("click", function(){ setMode("auto"); });
+  btnMan.addEventListener("click",  function(){ setMode("manual"); });
+
+  // start
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce){
+    mode = "manual";
+    btnAuto.classList.remove("on");
+    btnMan.classList.add("on");
+    chips.classList.add("manual");
+    renderNow({r:181, g:92, b:255});
+  } else {
+    autoLoop(gen);
+  }
+})();
+</script>
+</body>
+</html>
