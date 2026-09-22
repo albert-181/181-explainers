@@ -15,10 +15,12 @@
     --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:transparent}
+  html,body{background:transparent;height:100%;overflow:hidden}
   body{font-family:var(--body);color:var(--black);-webkit-font-smoothing:antialiased}
 
-  .wrap{max-width:1300px;margin:0 auto;padding:16px 20px 20px}
+  /* drawn once at 1280 x 720, then scaled to fit the frame it sits in */
+  #fit{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:50% 50%}
+  .wrap{width:1280px;height:720px;padding:22px 34px 18px;display:flex;flex-direction:column}
 
   .bar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .bar .left{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -47,17 +49,17 @@
     width:10px;height:14px;background:var(--white);border:2px solid var(--black);border-radius:0;
   }
 
-  .rule{height:2px;background:var(--black);margin:12px 0 14px}
-  .rule.thin{height:1px;opacity:.22;margin:14px 0 12px}
+  .rule{height:2px;background:var(--black);margin:10px 0 12px;flex:0 0 auto}
+  .rule.thin{height:1px;opacity:.22;margin:10px 0 10px}
 
-  .unis{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px}
-  .uni .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px}
-  .uni .name{font-family:var(--display);font-weight:500;font-size:15px;letter-spacing:.1em}
+  .unis{display:grid;grid-template-columns:1fr 1fr;gap:18px 28px;flex:0 0 auto}
+  .uni .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px}
+  .uni .name{font-family:var(--display);font-weight:500;font-size:14px;letter-spacing:.1em}
   .uni .range{font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.6;white-space:nowrap}
 
   .ugrid{display:grid;grid-template-columns:repeat(32,1fr);gap:1px}
   .ucell{
-    aspect-ratio:1/1;background:var(--white);
+    height:11px;background:var(--white);
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.10);
   }
   .ucell.pixstart{box-shadow:inset 0 0 0 1px rgba(0,0,0,.10), inset 2px 0 0 0 rgba(0,0,0,.45)}
@@ -65,8 +67,8 @@
 
   .read{
     font-family:var(--display);font-weight:500;
-    font-size:clamp(14px,1.5vw,19px);line-height:1.2;letter-spacing:-.01em;
-    margin-top:14px;min-height:1.2em;
+    font-size:17px;line-height:1.2;letter-spacing:-.01em;
+    margin-top:10px;min-height:1.2em;
   }
 
   .fixture svg{display:block;width:100%;height:auto}
@@ -74,15 +76,12 @@
   .blab{font-family:var(--display);font-weight:500;font-size:15px;letter-spacing:.1em;fill:var(--black);text-anchor:middle}
   .bsub{font-family:var(--body);font-size:12px;letter-spacing:.16em;fill:var(--black);opacity:.6;text-anchor:middle}
 
-  .foot{font-size:11px;line-height:1.6;margin-top:12px;opacity:.8}
+  .foot{font-size:11px;line-height:1.5;margin-top:8px;opacity:.8}
   .foot::before{content:"\2198";margin-right:8px}
-
-  @media (max-width:900px){
-    .unis{grid-template-columns:1fr}
-  }
 </style>
 </head>
 <body>
+<div id="fit">
 <div class="wrap">
 
   <div class="bar">
@@ -113,12 +112,13 @@
   <div class="rule thin"></div>
 
   <div class="fixture">
-    <svg id="fix" viewBox="0 0 1700 150" role="img"
+    <svg id="fix" viewBox="0 0 1700 132" role="img"
          aria-label="One long fixture, split into four universes across its length"></svg>
   </div>
 
   <p class="foot" id="foot"></p>
 
+</div>
 </div>
 
 <script>
@@ -244,7 +244,7 @@
 
   // ---------- the fixture ----------
   var fix = document.getElementById("fix");
-  var FW = 1700, BAR_Y = 84, BAR_H = 52;
+  var FW = 1700, BAR_Y = 70, BAR_H = 46;
   var dots = [], segMarks = [];
 
   function buildFixture(){
@@ -273,9 +273,9 @@
     for(var v=0;v<NU;v++){
       var x0 = v*segW + 4, x1 = (v+1)*segW - 4;
       fix.appendChild(el("path", {"class":"brk",
-        d:"M " + x0 + ",52 L " + x0 + ",64 L " + x1 + ",64 L " + x1 + ",52"}));
-      fix.appendChild(txt((x0+x1)/2, 22, "UNIVERSE " + (v+1), "blab"));
-      var r = el("text", {x:(x0+x1)/2, y:42, "class":"bsub"});
+        d:"M " + x0 + ",46 L " + x0 + ",56 L " + x1 + ",56 L " + x1 + ",46"}));
+      fix.appendChild(txt((x0+x1)/2, 18, "UNIVERSE " + (v+1), "blab"));
+      var r = el("text", {x:(x0+x1)/2, y:36, "class":"bsub"});
       r.textContent = "PIXELS " + (v*PIX + 1) + " TO " + ((v+1)*PIX);
       fix.appendChild(r);
       segMarks.push(r);
@@ -288,13 +288,13 @@
     var glow = el("g", {filter:"url(#fg)", opacity:"0.75"});
     var glows = [];
     for(var p=0;p<TOT;p++){
-      var gl = el("rect", {x:p*pw, y:BAR_Y+12, width:Math.max(1.2, pw), height:BAR_H-24});
+      var gl = el("rect", {x:p*pw, y:BAR_Y+10, width:Math.max(1.2, pw), height:BAR_H-20});
       glow.appendChild(gl); glows.push(gl);
     }
     fix.appendChild(glow);
 
     for(var q=0;q<TOT;q++){
-      var d = el("rect", {x:q*pw + pw*0.12, y:BAR_Y+14, width:Math.max(1, pw*0.76), height:BAR_H-28});
+      var d = el("rect", {x:q*pw + pw*0.12, y:BAR_Y+12, width:Math.max(1, pw*0.76), height:BAR_H-24});
       fix.appendChild(d);
       dots.push({body:d, glow:glows[q]});
     }
@@ -302,7 +302,7 @@
     // where one universe hands over to the next
     for(var s=1;s<NU;s++){
       var sx = s*segW;
-      fix.appendChild(el("line", {x1:sx, y1:BAR_Y-10, x2:sx, y2:BAR_Y+BAR_H+10,
+      fix.appendChild(el("line", {x1:sx, y1:BAR_Y-8, x2:sx, y2:BAR_Y+BAR_H+8,
         stroke:"#000", "stroke-width":2, "stroke-dasharray":"5 5"}));
     }
   }
@@ -396,6 +396,15 @@
 
   // ---------- start ----------
   applySet(); relabel(); buildFixture(); refresh();
+
+  // scale the 1280 x 720 canvas into whatever frame this page is embedded in
+  var fitEl = document.getElementById("fit");
+  function fit(){
+    var k = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    fitEl.style.transform = "translate(-50%,-50%) scale(" + k + ")";
+  }
+  fit();
+  window.addEventListener("resize", fit);
 
   var FPS = 12, DEG_PER_SEC = 50;
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
