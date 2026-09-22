@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Four universes, one fixture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --black:#000000;
+    --white:#ffffff;
+    --display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
+    --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:transparent}
+  body{font-family:var(--body);color:var(--black);-webkit-font-smoothing:antialiased}
+
+  .wrap{max-width:1300px;margin:0 auto;padding:16px 20px 20px}
+
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .bar .left{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+
+  .seg{display:inline-flex;border:2px solid var(--black)}
+  .seg button{
+    font-family:var(--body);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    padding:9px 15px;background:transparent;color:var(--black);border:0;cursor:pointer;line-height:1;
+  }
+  .seg button + button{border-left:2px solid var(--black)}
+  .seg button.on{background:var(--black);color:var(--white)}
+
+  .huebox{display:flex;align-items:center;gap:10px}
+  .huebox.off{opacity:.28;pointer-events:none}
+  .huebox .lab{font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+  .huebox .sw{width:26px;height:26px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:170px;height:16px;background:transparent;cursor:pointer}
+  input[type=range]:focus{outline:none}
+  input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--black)}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:12px;height:16px;margin-top:-7px;
+    background:var(--white);border:2px solid var(--black);border-radius:0;
+  }
+  input[type=range]::-moz-range-track{height:2px;background:var(--black)}
+  input[type=range]::-moz-range-thumb{
+    width:10px;height:14px;background:var(--white);border:2px solid var(--black);border-radius:0;
+  }
+
+  .rule{height:2px;background:var(--black);margin:12px 0 14px}
+  .rule.thin{height:1px;opacity:.22;margin:14px 0 12px}
+
+  .unis{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px}
+  .uni .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px}
+  .uni .name{font-family:var(--display);font-weight:500;font-size:15px;letter-spacing:.1em}
+  .uni .range{font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.6;white-space:nowrap}
+
+  .ugrid{display:grid;grid-template-columns:repeat(32,1fr);gap:1px}
+  .ucell{
+    aspect-ratio:1/1;background:var(--white);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.10);
+  }
+  .ucell.pixstart{box-shadow:inset 0 0 0 1px rgba(0,0,0,.10), inset 2px 0 0 0 rgba(0,0,0,.45)}
+  .ucell.spare{background:repeating-linear-gradient(45deg,#e4e4e4,#e4e4e4 2px,#fff 2px,#fff 4px) !important}
+
+  .read{
+    font-family:var(--display);font-weight:500;
+    font-size:clamp(14px,1.5vw,19px);line-height:1.2;letter-spacing:-.01em;
+    margin-top:14px;min-height:1.2em;
+  }
+
+  .fixture svg{display:block;width:100%;height:auto}
+  .brk{stroke:var(--black);stroke-width:1.6;fill:none}
+  .blab{font-family:var(--display);font-weight:500;font-size:15px;letter-spacing:.1em;fill:var(--black);text-anchor:middle}
+  .bsub{font-family:var(--body);font-size:12px;letter-spacing:.16em;fill:var(--black);opacity:.6;text-anchor:middle}
+
+  .foot{font-size:11px;line-height:1.6;margin-top:12px;opacity:.8}
+  .foot::before{content:"\2198";margin-right:8px}
+
+  @media (max-width:900px){
+    .unis{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <div class="left">
+      <div class="seg" role="group" aria-label="Pixel type">
+        <button type="button" id="t-rgb" class="on">RGB</button>
+        <button type="button" id="t-rgbw">RGBW</button>
+      </div>
+      <div class="seg" role="group" aria-label="Pattern">
+        <button type="button" id="m-black">Black</button>
+        <button type="button" id="m-color">Color</button>
+        <button type="button" id="m-wave" class="on">Wave</button>
+      </div>
+    </div>
+    <div class="huebox off" id="huebox">
+      <span class="lab">Hue</span>
+      <input type="range" id="hue" min="0" max="359" value="205" aria-label="Color hue">
+      <span class="sw" id="hsw"></span>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="unis" id="unis"></div>
+
+  <div class="read" id="read">&nbsp;</div>
+
+  <div class="rule thin"></div>
+
+  <div class="fixture">
+    <svg id="fix" viewBox="0 0 1700 150" role="img"
+         aria-label="One long fixture, split into four universes across its length"></svg>
+  </div>
+
+  <p class="foot" id="foot"></p>
+
+</div>
+
+<script>
+(function(){
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var CH = 512;        // channels per universe
+  var NU = 4;          // universes
+
+  var SETS = {
+    rgb: {
+      cpp: 3,
+      roles: [
+        {L:"R", n:"Red",   c:[224, 32, 32]},
+        {L:"G", n:"Green", c:[0, 158, 58]},
+        {L:"B", n:"Blue",  c:[24, 78, 224]}
+      ],
+      foot: "Three channels per RGB pixel, so 170 pixels fit in a universe and channels 511 and 512 are left over. A 680 pixel run needs four universes, and in each one the channel numbers start again at 1."
+    },
+    rgbw: {
+      cpp: 4,
+      roles: [
+        {L:"R", n:"Red",   c:[224, 32, 32]},
+        {L:"G", n:"Green", c:[0, 158, 58]},
+        {L:"B", n:"Blue",  c:[24, 78, 224]},
+        {L:"W", n:"White", c:[205, 150, 55]}
+      ],
+      foot: "Four channels per RGBW pixel, so 128 pixels fit a universe exactly and nothing is left over. A 512 pixel run needs four universes, and in each one the channel numbers start again at 1."
+    }
+  };
+
+  var type = "rgb";
+  var mode = "wave";
+  var hue = 205;
+  var phase = 0;
+
+  var data = [];
+  for(var u=0;u<NU;u++){ data.push(new Uint8Array(CH)); }
+
+  var cpp, roles, PIX, TOT, SPARE_FROM;
+
+  function applySet(){
+    var s = SETS[type];
+    cpp = s.cpp;
+    roles = s.roles;
+    PIX = Math.floor(CH / cpp);      // pixels per universe
+    TOT = PIX * NU;                  // pixels on the fixture
+    SPARE_FROM = PIX * cpp;
+    document.getElementById("foot").textContent = s.foot;
+  }
+
+  function hsl(h,s,l){
+    h = ((h % 360) + 360) % 360;
+    var c = (1-Math.abs(2*l-1))*s, x = c*(1-Math.abs((h/60)%2-1)), m = l-c/2, r,g,b;
+    if(h<60){r=c;g=x;b=0;} else if(h<120){r=x;g=c;b=0;} else if(h<180){r=0;g=c;b=x;}
+    else if(h<240){r=0;g=x;b=c;} else if(h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+    return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+  }
+
+  // one pattern over the whole fixture, then cut into universes
+  function generate(){
+    for(var p=0;p<TOT;p++){
+      var rgb, w = 0;
+      if(mode === "black"){ rgb = [0,0,0]; }
+      else if(mode === "color"){ rgb = hsl(hue, 1, 0.5); }
+      else {
+        rgb = hsl((p/TOT)*720 + phase, 1, 0.5);
+        w = Math.round(45 + 45*Math.sin((p/TOT)*Math.PI*8 - phase/28));
+      }
+      var u = Math.floor(p / PIX);
+      var b = (p % PIX) * cpp;
+      data[u][b] = rgb[0]; data[u][b+1] = rgb[1]; data[u][b+2] = rgb[2];
+      if(cpp === 4){ data[u][b+3] = w; }
+    }
+    for(var v=0;v<NU;v++){
+      for(var i=SPARE_FROM;i<CH;i++){ data[v][i] = 0; }
+    }
+  }
+
+  // ---------- the four grids ----------
+  var unis = document.getElementById("unis");
+  var cells = [], ranges = [];
+  for(var v=0;v<NU;v++){
+    var box = document.createElement("div"); box.className = "uni";
+    var head = document.createElement("div"); head.className = "head";
+    var nm = document.createElement("div"); nm.className = "name";
+    nm.textContent = "UNIVERSE " + (v+1);
+    var rg = document.createElement("div"); rg.className = "range";
+    head.appendChild(nm); head.appendChild(rg);
+    box.appendChild(head);
+    ranges.push(rg);
+
+    var g = document.createElement("div"); g.className = "ugrid";
+    g.dataset.u = v;
+    var list = [];
+    for(var i=0;i<CH;i++){
+      var c = document.createElement("div");
+      c.className = "ucell";
+      c.dataset.i = i;
+      g.appendChild(c);
+      list.push(c);
+    }
+    cells.push(list);
+    box.appendChild(g);
+    unis.appendChild(box);
+
+    g.addEventListener("pointermove", onHover);
+    g.addEventListener("pointerleave", function(){ hover = null; say(); });
+  }
+
+  function relabel(){
+    for(var v=0;v<NU;v++){
+      ranges[v].textContent = "PIXELS " + (v*PIX + 1) + " TO " + ((v+1)*PIX);
+      for(var i=0;i<CH;i++){
+        var spare = i >= SPARE_FROM;
+        var cls = "ucell";
+        if(!spare && i % cpp === 0){ cls += " pixstart"; }
+        if(spare){ cls += " spare"; }
+        cells[v][i].className = cls;
+        if(spare){ cells[v][i].style.background = ""; }
+      }
+    }
+  }
+
+  // ---------- the fixture ----------
+  var fix = document.getElementById("fix");
+  var FW = 1700, BAR_Y = 84, BAR_H = 52;
+  var dots = [], segMarks = [];
+
+  function buildFixture(){
+    while(fix.firstChild){ fix.removeChild(fix.firstChild); }
+    dots = [];
+
+    var defs = document.createElementNS(SVGNS, "defs");
+    defs.innerHTML = '<filter id="fg" x="-200%" y="-200%" width="500%" height="500%">' +
+                     '<feGaussianBlur stdDeviation="4"/></filter>';
+    fix.appendChild(defs);
+
+    function el(t, a){
+      var n = document.createElementNS(SVGNS, t);
+      for(var k in a){ n.setAttribute(k, a[k]); }
+      return n;
+    }
+    function txt(x, y, s, cls){
+      var n = el("text", {x:x, y:y, "class":cls});
+      n.textContent = s;
+      return n;
+    }
+
+    var segW = FW / NU;
+
+    // brackets, one per universe
+    for(var v=0;v<NU;v++){
+      var x0 = v*segW + 4, x1 = (v+1)*segW - 4;
+      fix.appendChild(el("path", {"class":"brk",
+        d:"M " + x0 + ",52 L " + x0 + ",64 L " + x1 + ",64 L " + x1 + ",52"}));
+      fix.appendChild(txt((x0+x1)/2, 22, "UNIVERSE " + (v+1), "blab"));
+      var r = el("text", {x:(x0+x1)/2, y:42, "class":"bsub"});
+      r.textContent = "PIXELS " + (v*PIX + 1) + " TO " + ((v+1)*PIX);
+      fix.appendChild(r);
+      segMarks.push(r);
+    }
+
+    // the run itself
+    fix.appendChild(el("rect", {x:0, y:BAR_Y, width:FW, height:BAR_H, fill:"#171717"}));
+
+    var pw = FW / TOT;
+    var glow = el("g", {filter:"url(#fg)", opacity:"0.75"});
+    var glows = [];
+    for(var p=0;p<TOT;p++){
+      var gl = el("rect", {x:p*pw, y:BAR_Y+12, width:Math.max(1.2, pw), height:BAR_H-24});
+      glow.appendChild(gl); glows.push(gl);
+    }
+    fix.appendChild(glow);
+
+    for(var q=0;q<TOT;q++){
+      var d = el("rect", {x:q*pw + pw*0.12, y:BAR_Y+14, width:Math.max(1, pw*0.76), height:BAR_H-28});
+      fix.appendChild(d);
+      dots.push({body:d, glow:glows[q]});
+    }
+
+    // where one universe hands over to the next
+    for(var s=1;s<NU;s++){
+      var sx = s*segW;
+      fix.appendChild(el("line", {x1:sx, y1:BAR_Y-10, x2:sx, y2:BAR_Y+BAR_H+10,
+        stroke:"#000", "stroke-width":2, "stroke-dasharray":"5 5"}));
+    }
+  }
+
+  var WTINT = [1, 0.82, 0.64];
+
+  function paintAll(){
+    for(var v=0;v<NU;v++){
+      var d = data[v], list = cells[v];
+      for(var i=0;i<SPARE_FROM;i++){
+        var col = roles[i % cpp].c, f = d[i]/255;
+        list[i].style.background = "rgb(" +
+          Math.round(255 + (col[0]-255)*f) + "," +
+          Math.round(255 + (col[1]-255)*f) + "," +
+          Math.round(255 + (col[2]-255)*f) + ")";
+      }
+    }
+    for(var p=0;p<TOT;p++){
+      var u = Math.floor(p / PIX), b = (p % PIX) * cpp;
+      var r = data[u][b], g = data[u][b+1], bl = data[u][b+2];
+      if(cpp === 4){
+        var w = data[u][b+3];
+        r = Math.min(255, r + w*WTINT[0]);
+        g = Math.min(255, g + w*WTINT[1]);
+        bl = Math.min(255, bl + w*WTINT[2]);
+      }
+      var c = "rgb(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(bl) + ")";
+      dots[p].body.setAttribute("fill", c);
+      dots[p].glow.setAttribute("fill", c);
+    }
+  }
+
+  // ---------- readout ----------
+  var read = document.getElementById("read");
+  var hover = null;
+  function onHover(e){
+    var c = e.target.closest(".ucell");
+    if(!c){ return; }
+    hover = {u:+e.currentTarget.dataset.u, i:+c.dataset.i};
+    say();
+  }
+  function say(){
+    if(!hover){ read.innerHTML = "&nbsp;"; return; }
+    var u = hover.u, i = hover.i;
+    if(i >= SPARE_FROM){
+      read.textContent = "Universe " + (u+1) + "  ·  channel " + (i+1) + "  ·  spare, no pixel uses it";
+      return;
+    }
+    var local = Math.floor(i/cpp) + 1;
+    read.textContent = "Universe " + (u+1) +
+      "  ·  channel " + (i+1) +
+      "  ·  " + roles[i % cpp].n +
+      "  ·  " + data[u][i] +
+      "  ·  pixel " + local + " of this universe, " + (u*PIX + local) + " on the fixture";
+  }
+
+  // ---------- controls ----------
+  var tBtn = {rgb:document.getElementById("t-rgb"), rgbw:document.getElementById("t-rgbw")};
+  var mBtn = {black:document.getElementById("m-black"),
+              color:document.getElementById("m-color"),
+              wave: document.getElementById("m-wave")};
+  var huebox = document.getElementById("huebox");
+  var hsw = document.getElementById("hsw");
+
+  function refresh(){ generate(); paintAll(); say(); }
+
+  function setType(t){
+    type = t;
+    for(var k in tBtn){ tBtn[k].classList.toggle("on", k === t); }
+    applySet(); relabel(); buildFixture(); refresh();
+  }
+  function setMode(m){
+    mode = m;
+    for(var k in mBtn){ mBtn[k].classList.toggle("on", k === m); }
+    huebox.classList.toggle("off", m !== "color");
+    refresh();
+  }
+  tBtn.rgb .addEventListener("click", function(){ setType("rgb"); });
+  tBtn.rgbw.addEventListener("click", function(){ setType("rgbw"); });
+  mBtn.black.addEventListener("click", function(){ setMode("black"); });
+  mBtn.color.addEventListener("click", function(){ setMode("color"); });
+  mBtn.wave .addEventListener("click", function(){ setMode("wave"); });
+
+  var hueIn = document.getElementById("hue");
+  function hueSwatch(){ hsw.style.background = "rgb(" + hsl(hue,1,0.5).join(",") + ")"; }
+  hueIn.addEventListener("input", function(){
+    hue = +hueIn.value; hueSwatch();
+    if(mode === "color"){ refresh(); }
+  });
+  hueSwatch();
+
+  // ---------- start ----------
+  applySet(); relabel(); buildFixture(); refresh();
+
+  var FPS = 12, DEG_PER_SEC = 50;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(!reduce){
+    setInterval(function(){
+      if(mode !== "wave"){ return; }
+      phase += DEG_PER_SEC / FPS;
+      refresh();
+    }, Math.round(1000/FPS));
+  }
+})();
+</script>
+</body>
+</html>
