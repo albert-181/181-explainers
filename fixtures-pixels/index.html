@@ -3,26 +3,86 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pixel by pixel, or all at once</title>
+<title>One pixel, many pixels</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:transparent}
+  html,body{background:#ffffff}
   body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
   .stage{width:100%;max-width:1400px}
   svg{display:block;width:100%;height:auto}
+
+  .housing-out{fill:#171717}
+  .knurl{fill:#242424}
+  .lens-ring{fill:#2b2b2b}
+  .face{fill:#0a0a0a}
+  .strap{fill:#1c1c1c}
+  .strap-hi{fill:#2e2e2e}
+  .tab{fill:#121212}
+
+  .groove{stroke:rgba(0,0,0,.16);stroke-width:1}
+  .seam{stroke:rgba(0,0,0,.3);stroke-width:1}
+  .edge{stroke:rgba(0,0,0,.34);stroke-width:1;fill:none}
+  .pocket{fill:#20242a;stroke:rgba(0,0,0,.5);stroke-width:1}
+  .pocket-hi{stroke:rgba(255,255,255,.22);stroke-width:1;fill:none}
+  .screw{fill:none;stroke:rgba(0,0,0,.4);stroke-width:1.4}
 </style>
 </head>
 <body>
 <div class="stage">
-  <svg id="scene" viewBox="0 0 1600 480" role="img"
-       aria-label="Two linear fixtures, the upper one changing between purple and white as a single color, the lower one running a purple to white gradient along its pixels">
+  <svg id="scene" viewBox="-160 0 1920 470" role="img"
+       aria-label="Three single pixel modules above a linear fixture whose many pixels resolve the same travelling pattern">
     <defs>
+      <filter id="bloom" x="-140%" y="-140%" width="380%" height="380%">
+        <feGaussianBlur stdDeviation="8"/>
+      </filter>
       <filter id="bloomS" x="-200%" y="-200%" width="500%" height="500%">
         <feGaussianBlur stdDeviation="8"/>
       </filter>
       <filter id="haze" x="-160%" y="-160%" width="420%" height="420%">
         <feGaussianBlur stdDeviation="26"/>
       </filter>
+      <filter id="soft" x="-40%" y="-200%" width="180%" height="500%">
+        <feGaussianBlur stdDeviation="9"/>
+      </filter>
+
+      <!-- anodised aluminium extrusion, seen from the side -->
+      <linearGradient id="alu" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"    stop-color="#f2f2f2"/>
+        <stop offset="0.08" stop-color="#dedede"/>
+        <stop offset="0.30" stop-color="#cbcbcb"/>
+        <stop offset="0.52" stop-color="#c2c2c2"/>
+        <stop offset="0.74" stop-color="#b0b0b0"/>
+        <stop offset="0.93" stop-color="#9a9a9a"/>
+        <stop offset="1"    stop-color="#868686"/>
+      </linearGradient>
+      <linearGradient id="aluCap" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"    stop-color="#e2e2e2"/>
+        <stop offset="0.45" stop-color="#b6b6b6"/>
+        <stop offset="1"    stop-color="#8d8d8d"/>
+      </linearGradient>
+      <linearGradient id="brk" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"    stop-color="#c4c4c4"/>
+        <stop offset="0.5"  stop-color="#a8a8a8"/>
+        <stop offset="1"    stop-color="#8a8a8a"/>
+      </linearGradient>
+      <!-- moulded connector body and cable, seen from the side -->
+      <linearGradient id="conn" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"    stop-color="#4a4a4a"/>
+        <stop offset="0.16" stop-color="#2a2a2a"/>
+        <stop offset="0.48" stop-color="#171717"/>
+        <stop offset="0.82" stop-color="#101010"/>
+        <stop offset="1"    stop-color="#242424"/>
+      </linearGradient>
+      <linearGradient id="cable" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"    stop-color="#3d3d3d"/>
+        <stop offset="0.3"  stop-color="#1b1b1b"/>
+        <stop offset="1"    stop-color="#0c0c0c"/>
+      </linearGradient>
+      <linearGradient id="lensGloss" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity="0.34"/>
+        <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.05"/>
+        <stop offset="1"   stop-color="#000000" stop-opacity="0.16"/>
+      </linearGradient>
     </defs>
     <g id="world"></g>
   </svg>
@@ -35,89 +95,230 @@
 
   var W = 1600;
 
-  // two identical fixtures, one above the other
-  var CY = [110, 370];
-  var BAR_X = 0, BAR_W = 1600, BAR_H = 92;
-  var NLED = 24, LED_X0 = BAR_X + 20, LED_SPAN = BAR_W - 40;
+  // ---- row 1: three XT modules, one pixel each
+  var MODULES = 3, GAP = 416, X0 = 384, CY1 = 116;
+  var R_OUT = 60, R_KNURL = 55, R_LENS = 48, R_FACE = 41;
+  var LEDS = 6, R_LED = 25, LED_S = 14;
+
+  // ---- row 2: one linear fixture, many pixels
+  var CY2 = 344;
+  var BAR_X = 60, BAR_W = 1480, BAR_H = 92;
+  var CAP = 18;
+  var NLED = 24, LED_X0 = BAR_X + 32, LED_SPAN = BAR_W - 64;
   var WIN = 40, LIT = 26;
-
-  // the two ends of the mix
-  var PURPLE = [181, 92, 255];
-  var WHITE  = [255, 255, 255];
-
-  var CYCLES = 1.5;      // how many purple to white runs fit along the top bar
-  var SPEED  = 0.75;     // radians per second
 
   function el(t, a){
     var n = document.createElementNS(NS, t);
     for(var k in a){ n.setAttribute(k, a[k]); }
     return n;
   }
-
-  // mixing two light sources happens in linear light, not in sRGB numbers
-  function toLinear(u){ u = u/255; return u <= 0.04045 ? u/12.92 : Math.pow((u+0.055)/1.055, 2.4); }
-  function toSRGB(v){
-    v = Math.max(0, Math.min(1, v));
-    return Math.round(255 * (v <= 0.0031308 ? 12.92*v : 1.055*Math.pow(v, 1/2.4) - 0.055));
-  }
-  var LP = PURPLE.map(toLinear), LW = WHITE.map(toLinear);
-  function mix(t){
-    t = Math.max(0, Math.min(1, t));
-    return "rgb(" + toSRGB(LP[0] + (LW[0]-LP[0])*t) + "," +
-                    toSRGB(LP[1] + (LW[1]-LP[1])*t) + "," +
-                    toSRGB(LP[2] + (LW[2]-LP[2])*t) + ")";
+  function hue2rgb(h){
+    h = ((h % 360) + 360) % 360;
+    var x = 1-Math.abs((h/60)%2-1), r,g,b;
+    if(h<60){r=1;g=x;b=0;} else if(h<120){r=x;g=1;b=0;} else if(h<180){r=0;g=1;b=x;}
+    else if(h<240){r=0;g=x;b=1;} else if(h<300){r=x;g=0;b=1;} else {r=1;g=0;b=x;}
+    return "rgb(" + Math.round(r*255) + "," + Math.round(g*255) + "," + Math.round(b*255) + ")";
   }
 
-  function buildBar(cy){
-    var pitch = LED_SPAN / NLED;
-    var lx = [];
-    for(var n=0;n<NLED;n++){ lx.push(LED_X0 + pitch*(n+0.5)); }
+  // one wave crossing the whole canvas, so both rows read the same moment in the same effect
+  var CYCLES = 1.5, SPEED = 40;
+  function hueAt(x, phase){ return (x / W) * CYCLES * 360 + phase; }
 
-    // spill first, so it sits around the bar instead of over it
-    var hazeGrp = el("g", {filter:"url(#haze)", opacity:"0.42"});
-    var hazes = [];
-    for(var a=0;a<NLED;a++){
-      var hz = el("rect", {x:lx[a]-WIN/2, y:cy-WIN*0.8, width:WIN, height:WIN*1.6});
-      hazeGrp.appendChild(hz); hazes.push(hz);
+  // tunable white, swept in mired so the steps read evenly across the range
+  var K_WARM = 2200, K_COOL = 7500;
+  var M_WARM = 1e6 / K_WARM, M_COOL = 1e6 / K_COOL;
+  function cctAt(x, phase){
+    var u = (x / W) * CYCLES * 2 * Math.PI + phase * Math.PI / 180;
+    var s = 0.5 + 0.5 * Math.sin(u);
+    return 1e6 / (M_WARM + (M_COOL - M_WARM) * s);
+  }
+  // planckian approximation, normalised so the brightest channel always sits at full
+  function kelvin2rgb(K){
+    var t = Math.max(1000, Math.min(12000, K)) / 100, r, g, b;
+    r = t <= 66 ? 255 : 329.698727446 * Math.pow(t - 60, -0.1332047592);
+    g = t <= 66 ? 99.4708025861 * Math.log(t) - 161.1195681661
+                : 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+    b = t >= 66 ? 255 : (t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307);
+    var m = Math.max(r, g, b) / 255;
+    r = Math.max(0, Math.min(255, r / m));
+    g = Math.max(0, Math.min(255, g / m));
+    b = Math.max(0, Math.min(255, b / m));
+    return "rgb(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(b) + ")";
+  }
+
+  // ================= row 1 =================
+  world.appendChild(el("rect", {x:-160, y:CY1-15, width:W+320, height:30, "class":"strap"}));
+  world.appendChild(el("rect", {x:-160, y:CY1-15, width:W+320, height:3,  "class":"strap-hi"}));
+
+  var mods = [];
+  for(var i=0;i<MODULES;i++){
+    var cx = X0 + GAP*i;
+
+    world.appendChild(el("rect", {x:cx-R_OUT-15, y:CY1-23, width:34, height:46, rx:3, "class":"tab"}));
+    world.appendChild(el("rect", {x:cx+R_OUT-19, y:CY1-23, width:34, height:46, rx:3, "class":"tab"}));
+
+    var g = el("g", {transform:"translate(" + cx + "," + CY1 + ")"});
+
+    var haze = el("circle", {r:R_FACE, filter:"url(#haze)", opacity:"0.5"});
+    g.appendChild(haze);
+
+    g.appendChild(el("circle", {r:R_OUT, "class":"housing-out"}));
+    for(var k=0;k<24;k++){
+      g.appendChild(el("rect", {x:-3, y:-R_KNURL, width:6, height:8,
+        transform:"rotate(" + (k*15) + ")", "class":"knurl"}));
     }
-    world.appendChild(hazeGrp);
+    g.appendChild(el("circle", {r:R_LENS, "class":"lens-ring"}));
+    g.appendChild(el("circle", {r:R_FACE, "class":"face"}));
 
-    world.appendChild(el("rect", {x:BAR_X, y:cy-BAR_H/2, width:BAR_W, height:BAR_H, fill:"#171717"}));
-
-    var bloomGrp = el("g", {filter:"url(#bloomS)", opacity:"0.85"});
-    var blooms = [];
-    for(var b=0;b<NLED;b++){
-      var bb = el("rect", {x:lx[b]-LIT*0.75, y:cy-LIT*0.75, width:LIT*1.5, height:LIT*1.5, rx:4});
-      bloomGrp.appendChild(bb); blooms.push(bb);
+    var bg = el("g", {filter:"url(#bloom)", opacity:"0.9"});
+    var blooms = [], chips = [];
+    for(var j=0;j<LEDS;j++){
+      var tf = "rotate(" + (j*360/LEDS) + ") translate(0," + (-R_LED) + ")";
+      var bl = el("rect", {x:-LED_S*0.85, y:-LED_S*0.85, width:LED_S*1.7, height:LED_S*1.7, transform:tf});
+      bg.appendChild(bl); blooms.push(bl);
     }
-    world.appendChild(bloomGrp);
-
-    var leds = [];
-    for(var c=0;c<NLED;c++){
-      var ld = el("rect", {x:lx[c]-LIT/2, y:cy-LIT/2, width:LIT, height:LIT, rx:3});
-      world.appendChild(ld); leds.push(ld);
+    g.appendChild(bg);
+    for(var j2=0;j2<LEDS;j2++){
+      var tf2 = "rotate(" + (j2*360/LEDS) + ") translate(0," + (-R_LED) + ")";
+      var c = el("rect", {x:-LED_S/2, y:-LED_S/2, width:LED_S, height:LED_S, transform:tf2});
+      g.appendChild(c); chips.push(c);
     }
 
-    return {x:lx, leds:leds, blooms:blooms, hazes:hazes};
+    world.appendChild(g);
+    mods.push({cx:cx, chips:chips, blooms:blooms, haze:haze});
   }
 
-  var zone = buildBar(CY[0]);    // one value for the whole fixture
-  var grad = buildBar(CY[1]);    // every pixel its own value
+  // ================= row 2 =================
+  var TOP = CY2 - BAR_H/2, BOT = CY2 + BAR_H/2;
 
-  function set(bar, i, col){
-    bar.leds[i].setAttribute("fill", col);
-    bar.blooms[i].setAttribute("fill", col);
-    bar.hazes[i].setAttribute("fill", col);
+  var pitch = LED_SPAN / NLED;
+  var lx = [];
+  for(var n=0;n<NLED;n++){ lx.push(LED_X0 + pitch*(n+0.5)); }
+
+  // spill first, so it surrounds the fixture instead of fogging its own housing
+  var hazeGrp = el("g", {filter:"url(#haze)", opacity:"0.5"});
+  var hazes = [];
+  for(var n2=0;n2<NLED;n2++){
+    var hz = el("rect", {x:lx[n2]-WIN/2, y:CY2-WIN*0.8, width:WIN, height:WIN*1.6});
+    hazeGrp.appendChild(hz); hazes.push(hz);
+  }
+  world.appendChild(hazeGrp);
+
+  // contact shadow
+  world.appendChild(el("rect", {x:BAR_X+30, y:BOT-4, width:BAR_W-60, height:16,
+    fill:"#000", opacity:"0.16", filter:"url(#soft)"}));
+
+  // input and output connectors: cable tail out of each end cap into a moulded plug
+  function seg(a, b, h, attrs){
+    var o = {x:Math.min(a,b), y:CY2-h/2, width:Math.abs(b-a), height:h};
+    for(var k in attrs){ o[k] = attrs[k]; }
+    return el("rect", o);
+  }
+  function connector(ax, d){
+    var g = el("g", {});
+
+    // cable, running from inside the cap out to the plug
+    g.appendChild(seg(ax - d*6, ax + d*78, 16, {rx:4, fill:"url(#cable)",
+      stroke:"rgba(0,0,0,.45)", "stroke-width":1}));
+    g.appendChild(el("rect", {x:Math.min(ax - d*6, ax + d*78), y:CY2-6, width:84, height:3,
+      fill:"rgba(255,255,255,.14)"}));
+
+    // ribbed strain relief at the cap
+    g.appendChild(seg(ax - d*4, ax + d*40, 30, {rx:7, fill:"url(#conn)",
+      stroke:"rgba(0,0,0,.45)", "stroke-width":1}));
+    for(var r=1;r<=5;r++){
+      var rrx = ax + d*(4 + r*6);
+      g.appendChild(el("line", {x1:rrx, y1:CY2-13, x2:rrx, y2:CY2+13,
+        stroke:"rgba(255,255,255,.10)", "stroke-width":2}));
+    }
+
+    // plug body
+    g.appendChild(seg(ax + d*74, ax + d*152, 40, {rx:8, fill:"url(#conn)",
+      stroke:"rgba(0,0,0,.5)", "stroke-width":1}));
+    g.appendChild(el("rect", {x:Math.min(ax + d*74, ax + d*152), y:CY2-18, width:78, height:3,
+      fill:"rgba(255,255,255,.16)"}));
+
+    // knurled coupling ring
+    g.appendChild(seg(ax + d*92, ax + d*126, 46, {rx:5, fill:"url(#conn)",
+      stroke:"rgba(0,0,0,.5)", "stroke-width":1}));
+    for(var q=0;q<7;q++){
+      var qx = ax + d*(95 + q*5);
+      g.appendChild(el("line", {x1:qx, y1:CY2-20, x2:qx, y2:CY2+20,
+        stroke:"rgba(255,255,255,.13)", "stroke-width":1.6}));
+    }
+
+    // mating face at the tip
+    g.appendChild(seg(ax + d*146, ax + d*156, 32, {rx:4, fill:"#0b0b0b",
+      stroke:"rgba(0,0,0,.5)", "stroke-width":1}));
+    g.appendChild(el("line", {x1:ax + d*146, y1:CY2-16, x2:ax + d*146, y2:CY2+16,
+      stroke:"rgba(255,255,255,.12)", "stroke-width":1.4}));
+
+    world.appendChild(g);
+  }
+  connector(BAR_X + 6, -1);
+  connector(BAR_X + BAR_W - 6, 1);
+
+  // the extrusion
+  world.appendChild(el("rect", {x:BAR_X, y:TOP, width:BAR_W, height:BAR_H,
+    fill:"url(#alu)", stroke:"rgba(0,0,0,.4)", "stroke-width":1}));
+  world.appendChild(el("line", {x1:BAR_X+1, y1:TOP+2.5, x2:BAR_X+BAR_W-1, y2:TOP+2.5,
+    stroke:"rgba(255,255,255,.75)", "stroke-width":2}));
+  world.appendChild(el("line", {x1:BAR_X, y1:CY2-30, x2:BAR_X+BAR_W, y2:CY2-30, "class":"groove"}));
+  world.appendChild(el("line", {x1:BAR_X, y1:CY2+30, x2:BAR_X+BAR_W, y2:CY2+30, "class":"groove"}));
+  world.appendChild(el("line", {x1:BAR_X, y1:BOT-3, x2:BAR_X+BAR_W, y2:BOT-3,
+    stroke:"rgba(0,0,0,.18)", "stroke-width":3}));
+
+  // end caps
+  [BAR_X, BAR_X + BAR_W - CAP].forEach(function(ex){
+    world.appendChild(el("rect", {x:ex, y:TOP, width:CAP, height:BAR_H,
+      fill:"url(#aluCap)", stroke:"rgba(0,0,0,.4)", "stroke-width":1}));
+  });
+  world.appendChild(el("line", {x1:BAR_X+CAP, y1:TOP, x2:BAR_X+CAP, y2:BOT, "class":"seam"}));
+  world.appendChild(el("line", {x1:BAR_X+BAR_W-CAP, y1:TOP, x2:BAR_X+BAR_W-CAP, y2:BOT, "class":"seam"}));
+  [BAR_X+CAP/2, BAR_X+BAR_W-CAP/2].forEach(function(sx){
+    world.appendChild(el("circle", {cx:sx, cy:TOP+14, r:3.4, "class":"screw"}));
+    world.appendChild(el("circle", {cx:sx, cy:BOT-14, r:3.4, "class":"screw"}));
+  });
+
+  // milled pockets
+  for(var n3=0;n3<NLED;n3++){
+    world.appendChild(el("rect", {x:lx[n3]-WIN/2, y:CY2-WIN/2, width:WIN, height:WIN,
+      rx:3, "class":"pocket"}));
+    world.appendChild(el("rect", {x:lx[n3]-WIN/2+1.5, y:CY2-WIN/2+1.5, width:WIN-3, height:WIN-3,
+      rx:2, "class":"pocket-hi"}));
   }
 
+  // emitters
+  var barBloomGrp = el("g", {filter:"url(#bloomS)", opacity:"0.85"});
+  var barBlooms = [], barLeds = [];
+  for(var n4=0;n4<NLED;n4++){
+    var bb = el("rect", {x:lx[n4]-LIT*0.75, y:CY2-LIT*0.75, width:LIT*1.5, height:LIT*1.5, rx:4});
+    barBloomGrp.appendChild(bb); barBlooms.push(bb);
+  }
+  world.appendChild(barBloomGrp);
+  for(var n5=0;n5<NLED;n5++){
+    var ld = el("rect", {x:lx[n5]-LIT/2, y:CY2-LIT/2, width:LIT, height:LIT, rx:3});
+    world.appendChild(ld); barLeds.push(ld);
+    world.appendChild(el("rect", {x:lx[n5]-LIT/2, y:CY2-LIT/2, width:LIT, height:LIT, rx:3,
+      fill:"url(#lensGloss)"}));
+  }
+
+  // ================= paint =================
   function paint(phase){
-    // top: one value, so the whole fixture crosses from purple to white together
-    var col = mix(0.5 + 0.5*Math.sin(phase));
-    for(var i=0;i<NLED;i++){ set(zone, i, col); }
-    // bottom: the mix travels along the bar, so purple and white are on it at the same moment
-    for(var j=0;j<NLED;j++){
-      var t = 0.5 + 0.5*Math.sin((grad.x[j]/W) * CYCLES * 2*Math.PI + phase);
-      set(grad, j, mix(t));
+    for(var i=0;i<mods.length;i++){
+      var m = mods[i];
+      var col = hue2rgb(hueAt(m.cx, phase));
+      for(var j=0;j<m.chips.length;j++){
+        m.chips[j].setAttribute("fill", col);
+        m.blooms[j].setAttribute("fill", col);
+      }
+      m.haze.setAttribute("fill", col);
+    }
+    for(var n=0;n<NLED;n++){
+      var c = kelvin2rgb(cctAt(lx[n], phase));
+      barLeds[n].setAttribute("fill", c);
+      barBlooms[n].setAttribute("fill", c);
+      hazes[n].setAttribute("fill", c);
     }
   }
 
