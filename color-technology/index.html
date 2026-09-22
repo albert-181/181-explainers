@@ -15,7 +15,7 @@
     --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:var(--white)}
+  html,body{background:transparent}
   body{font-family:var(--body);color:var(--black);-webkit-font-smoothing:antialiased}
 
   .wrap{max-width:1220px;margin:0 auto;padding:16px 24px 20px}
@@ -46,7 +46,7 @@
     transition:opacity .22s linear,background .22s linear;
   }
   .panel:hover{opacity:.72}
-  .panel.on{opacity:1;cursor:default;background:#f5f5f5}
+  .panel.on{opacity:1;cursor:default;background:rgba(0,0,0,.045)}
   .panel .head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
   .panel .name{
     font-family:var(--display);font-weight:500;
@@ -77,7 +77,7 @@
   .seg{display:inline-flex;border:2px solid var(--black)}
   .seg button{
     font-family:var(--body);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
-    padding:8px 14px;background:var(--white);color:var(--black);border:0;cursor:pointer;line-height:1;
+    padding:8px 14px;background:transparent;color:var(--black);border:0;cursor:pointer;line-height:1;
   }
   .seg button + button{border-left:2px solid var(--black)}
   .seg button.on{background:var(--black);color:var(--white)}
@@ -96,6 +96,7 @@
     .grid{grid-template-columns:1fr;gap:16px}
     #stage{order:-1}
   }
+
 </style>
 </head>
 <body>
