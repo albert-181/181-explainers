@@ -24,17 +24,10 @@
 
   .wrap{max-width:1060px;margin:0 auto;padding:18px 24px 22px}
 
-  .top{display:flex;justify-content:flex-end;align-items:flex-start;gap:20px;flex-wrap:wrap}
-  .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;line-height:1.6}
-  h1{
-    font-family:var(--display);font-weight:500;
-    font-size:clamp(28px,4.4vw,54px);line-height:1;letter-spacing:-.03em;margin:10px 0 12px;
-  }
-  .lede{font-size:clamp(13px,1.25vw,17px);line-height:1.5;max-width:66ch}
-  .rule{height:2px;background:var(--black);margin:18px 0 4px}
-  .rule.thin{height:1px;opacity:.22;margin:16px 0}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+  .rule{height:2px;background:var(--black);margin:16px 0 4px}
+  .rule.thin{height:1px;opacity:.22;margin:15px 0}
 
-  /* mode toggle */
   .seg{display:inline-flex;border:2px solid var(--black);flex:0 0 auto}
   .seg button{
     font-family:var(--body);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
@@ -44,21 +37,27 @@
   .seg button.on{background:var(--black);color:var(--white)}
 
   svg.wave{display:block;width:100%;height:auto}
+  svg.wave.off{display:none}
   .cell-line{stroke:var(--black);stroke-width:1;opacity:.12}
   .grp-line{stroke:var(--black);stroke-width:1;opacity:.38}
-  .fill{fill:var(--blue);opacity:0;transition:opacity .16s linear}
-  .bit{font-family:var(--display);font-weight:500;font-size:15px;fill:var(--black);text-anchor:middle;opacity:0;transition:opacity .16s linear}
+  .fill{fill:var(--blue);opacity:0;transition:opacity .15s linear}
+  .bit{font-family:var(--display);font-weight:500;fill:var(--black);text-anchor:middle;opacity:0;transition:opacity .15s linear}
+  #wave8 .bit{font-size:15px}
+  #wave16 .bit{font-size:14px}
   .trace{fill:none;stroke:var(--black);stroke-width:3;stroke-linejoin:miter;stroke-linecap:square}
   .grp-rule{stroke-width:3}
   .grp-label{font-family:var(--body);font-size:12px;letter-spacing:.2em;text-anchor:middle}
+  .row-tag{font-family:var(--body);font-size:15px;letter-spacing:.12em}
 
   .lower{display:flex;flex-wrap:wrap;gap:22px 28px;align-items:flex-start;margin-top:4px}
-  .chips{display:flex;gap:14px;flex:1 1 440px;min-width:300px}
+  .chips{display:flex;gap:14px;flex:1 1 450px;min-width:310px}
   .chip{flex:1 1 0;border-top:3px solid var(--black);padding-top:8px;opacity:.22;transition:opacity .3s linear}
   .chip.on{opacity:1}
   .chip .ch{font-size:10px;letter-spacing:.2em;text-transform:uppercase;line-height:1.6}
   .chip .bin{font-family:var(--display);font-weight:500;font-size:clamp(13px,1.6vw,20px);letter-spacing:.08em;line-height:1.5;white-space:nowrap}
   .chip .dec{font-family:var(--display);font-weight:500;font-size:clamp(24px,3.2vw,40px);line-height:1;letter-spacing:-.02em}
+  .chips.b16 .chip .bin{font-size:clamp(10px,1.25vw,15px);letter-spacing:.06em;line-height:1.6}
+  .chips.b16 .chip .dec{font-size:clamp(22px,2.9vw,36px)}
 
   .slider{display:none;margin-top:12px}
   .chips.manual .slider{display:block}
@@ -75,8 +74,8 @@
   }
 
   .pixelbox{display:flex;align-items:center;gap:16px;flex:0 0 auto;padding-top:4px}
-  .pixel{width:118px;height:118px;background:#0d0d0d;position:relative;flex:0 0 auto}
-  .emit{position:absolute;inset:15px;background:#0d0d0d;transition:background .4s linear,box-shadow .4s linear}
+  .pixel{width:118px;height:118px;position:relative;flex:0 0 auto}
+  .emit{position:absolute;inset:0;background:#0d0d0d;transition:background .4s linear,box-shadow .4s linear}
   .pixelbox .cap{font-size:10px;letter-spacing:.2em;text-transform:uppercase;line-height:1.7;max-width:110px}
 
   .result{
@@ -86,8 +85,10 @@
 
   @media (max-width:700px){
     .wrap{padding:18px 16px}
-    .bit{font-size:22px}
+    #wave8 .bit{font-size:22px}
+    #wave16 .bit{font-size:20px}
     .grp-label{font-size:18px}
+    .row-tag{font-size:22px}
     .lower{flex-direction:column}
   }
 </style>
@@ -96,6 +97,10 @@
 <div class="wrap">
 
   <div class="top">
+    <div class="seg" role="group" aria-label="Bit depth">
+      <button type="button" id="btn-8" class="on">8 bit</button>
+      <button type="button" id="btn-16">16 bit</button>
+    </div>
     <div class="seg" role="group" aria-label="Mode">
       <button type="button" id="btn-auto" class="on">Auto scroll</button>
       <button type="button" id="btn-man">Pick a color</button>
@@ -104,8 +109,10 @@
 
   <div class="rule"></div>
 
-  <svg class="wave" id="wave" viewBox="0 0 1150 206" role="img"
+  <svg class="wave" id="wave8" viewBox="0 0 1150 206" role="img"
        aria-label="Twenty four pulses, eight per color channel, forming one pixel color"></svg>
+  <svg class="wave off" id="wave16" viewBox="0 0 1150 352" role="img"
+       aria-label="Sixteen pulses per color channel, forty eight per pixel"></svg>
 
   <div class="rule thin"></div>
 
@@ -133,25 +140,33 @@
 
   <div class="rule thin"></div>
 
-  <div class="result">24 bits per pixel. 256 levels per channel. 16.7 million colors.</div>
+  <div class="result" id="result">24 bits per pixel. 256 levels per channel. 16.7 million colors.</div>
 
 </div>
 
 <script>
 (function(){
   var SVGNS = "http://www.w3.org/2000/svg";
-  var svg = document.getElementById("wave");
 
-  var X0 = 22, W = 46, N = 24;
-  var YL = 152, YH = 54;
-  var H1 = 34, H0 = 12;
+  function el(tag, attrs){
+    var n = document.createElementNS(SVGNS, tag);
+    for(var k in attrs){ n.setAttribute(k, attrs[k]); }
+    return n;
+  }
+  function bits(v, n){
+    var s = v.toString(2);
+    while(s.length < n){ s = "0" + s; }
+    return s;
+  }
+  function sleep(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
 
   var CH = [
-    {name:"RED",   color:"#e02020", bin:"bin-r", dec:"dec-r", chip:"chip-r", sl:"sl-r"},
-    {name:"GREEN", color:"#00a03c", bin:"bin-g", dec:"dec-g", chip:"chip-g", sl:"sl-g"},
-    {name:"BLUE",  color:"#1050e0", bin:"bin-b", dec:"dec-b", chip:"chip-b", sl:"sl-b"}
+    {wide:"RED",   narrow:"R", color:"#e02020", bin:"bin-r", dec:"dec-r", chip:"chip-r"},
+    {wide:"GREEN", narrow:"G", color:"#00a03c", bin:"bin-g", dec:"dec-g", chip:"chip-g"},
+    {wide:"BLUE",  narrow:"B", color:"#1050e0", bin:"bin-b", dec:"dec-b", chip:"chip-b"}
   ];
 
+  // the same five colors in both depths, the 16 bit values are the 8 bit ones times 257
   var FRAMES = [
     {r:181, g:92,  b:255},
     {r:255, g:176, b:0},
@@ -160,207 +175,365 @@
     {r:40,  g:120, b:255}
   ];
 
-  function el(tag, attrs){
-    var n = document.createElementNS(SVGNS, tag);
-    for(var k in attrs){ n.setAttribute(k, attrs[k]); }
-    return n;
-  }
-  function toBits(v){
-    var s = v.toString(2);
-    while(s.length < 8){ s = "0" + s; }
-    return s;
-  }
+  // ================= 8 bit: one row of 24 pulses, grouped per channel =================
+  function build8(){
+    var svg = document.getElementById("wave8");
+    var X0 = 22, W = 46, N = 24;
+    var YL = 152, YH = 54;
+    var H1 = 34, H0 = 12;
+    var BIT_MS = 125;
 
-  // static frame
-  for(var i=0;i<=N;i++){
-    var x = X0 + W*i;
-    svg.appendChild(el("line", {x1:x, y1:44, x2:x, y2:162,
-      "class": (i%8===0 ? "grp-line" : "cell-line")}));
-  }
-  for(var g=0;g<3;g++){
-    var gx = X0 + W*8*g, gw = W*8;
-    svg.appendChild(el("line", {x1:gx+3, y1:176, x2:gx+gw-3, y2:176,
-      stroke:CH[g].color, "class":"grp-rule"}));
-    var t = el("text", {x:gx+gw/2, y:196, "class":"grp-label", fill:CH[g].color});
-    t.textContent = CH[g].name;
-    svg.appendChild(t);
-  }
-
-  var trace = el("path", {"class":"trace", pathLength:"1"});
-  svg.appendChild(trace);
-
-  var rects = [], texts = [];
-  for(var i=0;i<N;i++){
-    var r = el("rect", {"class":"fill", x:X0+W*i, y:YH, width:H1, height:YL-YH});
-    svg.appendChild(r); rects.push(r);
-    var tx = el("text", {"class":"bit", x:X0+W*i, y:38});
-    svg.appendChild(tx); texts.push(tx);
-  }
-
-  function layout(bitsStr){
-    var d = "M 0," + YL;
-    for(var i=0;i<N;i++){
+    for(var i=0;i<=N;i++){
       var x = X0 + W*i;
-      var h = (bitsStr[i] === "1") ? H1 : H0;
-      d += " L " + x + "," + YL + " L " + x + "," + YH +
-           " L " + (x+h) + "," + YH + " L " + (x+h) + "," + YL;
-      rects[i].setAttribute("width", h);
-      texts[i].setAttribute("x", x + h/2);
-      texts[i].textContent = bitsStr[i];
+      svg.appendChild(el("line", {x1:x, y1:44, x2:x, y2:162,
+        "class": (i%8===0 ? "grp-line" : "cell-line")}));
     }
-    d += " L 1150," + YL;
-    trace.setAttribute("d", d);
+    for(var g=0;g<3;g++){
+      var gx = X0 + W*8*g, gw = W*8;
+      svg.appendChild(el("line", {x1:gx+3, y1:176, x2:gx+gw-3, y2:176,
+        stroke:CH[g].color, "class":"grp-rule"}));
+      var t = el("text", {x:gx+gw/2, y:196, "class":"grp-label", fill:CH[g].color});
+      t.textContent = CH[g].wide;
+      svg.appendChild(t);
+    }
+
+    var trace = el("path", {"class":"trace", pathLength:"1"});
+    svg.appendChild(trace);
+
+    var rects = [], texts = [];
+    for(var j=0;j<N;j++){
+      var r = el("rect", {"class":"fill", x:X0+W*j, y:YH, width:H1, height:YL-YH});
+      svg.appendChild(r); rects.push(r);
+      var tx = el("text", {"class":"bit", x:X0+W*j, y:38});
+      svg.appendChild(tx); texts.push(tx);
+    }
+
+    return {
+      svg: svg,
+      depth: 8,
+      max: 255,
+      chanMs: 8 * BIT_MS,
+      result: "24 bits per pixel. 256 levels per channel. 16.7 million colors.",
+
+      layoutAll: function(f){
+        var s = bits(f.r,8) + bits(f.g,8) + bits(f.b,8);
+        var d = "M 0," + YL;
+        for(var i=0;i<N;i++){
+          var x = X0 + W*i;
+          var h = (s[i] === "1") ? H1 : H0;
+          d += " L " + x + "," + YL + " L " + x + "," + YH +
+               " L " + (x+h) + "," + YH + " L " + (x+h) + "," + YL;
+          rects[i].setAttribute("width", h);
+          texts[i].setAttribute("x", x + h/2);
+          texts[i].textContent = s[i];
+        }
+        d += " L 1150," + YL;
+        trace.setAttribute("d", d);
+      },
+      setBits: function(on, staggered){
+        for(var i=0;i<N;i++){
+          var d = staggered ? (i*BIT_MS) + "ms" : "0ms";
+          rects[i].style.transitionDelay = d;
+          texts[i].style.transitionDelay = d;
+          rects[i].style.opacity = on ? 1 : 0;
+          texts[i].style.opacity = on ? 1 : 0;
+        }
+      },
+      armTraces: function(){
+        trace.style.transition = "none";
+        trace.style.strokeDasharray = 1;
+        trace.style.strokeDashoffset = 1;
+        trace.style.opacity = 1;
+      },
+      drawTraces: function(){
+        trace.style.transition = "stroke-dashoffset " + (N*BIT_MS) + "ms linear";
+        trace.style.strokeDashoffset = 0;
+      },
+      showTraces: function(){
+        trace.style.transition = "none";
+        trace.style.strokeDasharray = "none";
+        trace.style.strokeDashoffset = 0;
+        trace.style.opacity = 1;
+      },
+      fadeTraces: function(){
+        trace.style.transition = "opacity 450ms linear";
+        trace.style.opacity = 0;
+      }
+    };
   }
 
-  function sleep(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+  // ================= 16 bit: three rows of 16 pulses, one per channel =================
+  function build16(){
+    var svg = document.getElementById("wave16");
+    var B = 16;
+    var X0 = 78, W = 66;
+    var H1 = 48, H0 = 17;
+    var ROW_Y = [10, 126, 242];
+    var BIT_MS = 62;
+    var ROW_MS = B * BIT_MS;
 
-  var emit = document.getElementById("emit");
+    var rows = [];
+    for(var r=0;r<3;r++){
+      var base = ROW_Y[r];
+      var YH = base + 26;
+      var YL = base + 88;
 
-  function light(r,g,b){
-    emit.style.background = "rgb(" + r + "," + g + "," + b + ")";
-    emit.style.boxShadow = "0 0 46px 12px rgba(" + r + "," + g + "," + b + ",0.55)";
-  }
-  function showChip(idx, on){
-    document.getElementById(CH[idx].chip).classList.toggle("on", on);
-  }
-  function setChip(idx, bits, val){
-    document.getElementById(CH[idx].bin).textContent = bits;
-    document.getElementById(CH[idx].dec).textContent = val;
+      for(var i=0;i<=B;i++){
+        var x = X0 + W*i;
+        svg.appendChild(el("line", {x1:x, y1:base+18, x2:x, y2:YL+10, "class":"cell-line"}));
+      }
+
+      svg.appendChild(el("rect", {x:14, y:YH, width:5, height:YL-YH, fill:CH[r].color}));
+      var tag = el("text", {x:34, y:(YH+YL)/2 + 6, "class":"row-tag", fill:CH[r].color});
+      tag.textContent = CH[r].narrow;
+      svg.appendChild(tag);
+
+      var tr = el("path", {"class":"trace", pathLength:"1"});
+      svg.appendChild(tr);
+
+      var rects = [], texts = [];
+      for(var j=0;j<B;j++){
+        var rc = el("rect", {"class":"fill", x:X0+W*j, y:YH, width:H1, height:YL-YH});
+        svg.appendChild(rc); rects.push(rc);
+        var tx = el("text", {"class":"bit", x:X0+W*j, y:base+14});
+        svg.appendChild(tx); texts.push(tx);
+      }
+
+      rows.push({trace:tr, rects:rects, texts:texts, YH:YH, YL:YL});
+    }
+
+    function layoutRow(r, s){
+      var row = rows[r];
+      var d = "M 0," + row.YL;
+      for(var i=0;i<B;i++){
+        var x = X0 + W*i;
+        var h = (s[i] === "1") ? H1 : H0;
+        d += " L " + x + "," + row.YL + " L " + x + "," + row.YH +
+             " L " + (x+h) + "," + row.YH + " L " + (x+h) + "," + row.YL;
+        row.rects[i].setAttribute("width", h);
+        row.texts[i].setAttribute("x", x + h/2);
+        row.texts[i].textContent = s[i];
+      }
+      d += " L 1150," + row.YL;
+      row.trace.setAttribute("d", d);
+    }
+
+    return {
+      svg: svg,
+      depth: 16,
+      max: 65535,
+      chanMs: ROW_MS,
+      result: "48 bits per pixel. 65,536 levels per channel. 281 trillion colors.",
+
+      layoutAll: function(f){
+        layoutRow(0, bits(f.r,16));
+        layoutRow(1, bits(f.g,16));
+        layoutRow(2, bits(f.b,16));
+      },
+      setBits: function(on, staggered){
+        for(var r=0;r<3;r++){
+          for(var i=0;i<B;i++){
+            var d = staggered ? ((r*B + i) * BIT_MS) + "ms" : "0ms";
+            rows[r].rects[i].style.transitionDelay = d;
+            rows[r].texts[i].style.transitionDelay = d;
+            rows[r].rects[i].style.opacity = on ? 1 : 0;
+            rows[r].texts[i].style.opacity = on ? 1 : 0;
+          }
+        }
+      },
+      armTraces: function(){
+        for(var r=0;r<3;r++){
+          rows[r].trace.style.transition = "none";
+          rows[r].trace.style.strokeDasharray = 1;
+          rows[r].trace.style.strokeDashoffset = 1;
+          rows[r].trace.style.opacity = 1;
+        }
+      },
+      drawTraces: function(){
+        for(var r=0;r<3;r++){
+          rows[r].trace.style.transition =
+            "stroke-dashoffset " + ROW_MS + "ms linear " + (r*ROW_MS) + "ms";
+          rows[r].trace.style.strokeDashoffset = 0;
+        }
+      },
+      showTraces: function(){
+        for(var r=0;r<3;r++){
+          rows[r].trace.style.transition = "none";
+          rows[r].trace.style.strokeDasharray = "none";
+          rows[r].trace.style.strokeDashoffset = 0;
+          rows[r].trace.style.opacity = 1;
+        }
+      },
+      fadeTraces: function(){
+        for(var r=0;r<3;r++){
+          rows[r].trace.style.transition = "opacity 450ms linear";
+          rows[r].trace.style.opacity = 0;
+        }
+      }
+    };
   }
 
-  var BIT_MS = 125;
+  var V8 = build8(), V16 = build16();
+  var depth = 8;
+  function V(){ return depth === 8 ? V8 : V16; }
+
+  // ================= shared state =================
+  var emit    = document.getElementById("emit");
+  var chips   = document.getElementById("chips");
+  var result  = document.getElementById("result");
+  var sliders = [document.getElementById("sl-r"),
+                 document.getElementById("sl-g"),
+                 document.getElementById("sl-b")];
+
   var mode = "auto";
   var gen = 0;
-  var cur = {r:181, g:92, b:255};
+  var cur = {r:181, g:92, b:255};      // always held at the active depth
 
-  function clearBits(){
-    for(var i=0;i<N;i++){
-      rects[i].style.transitionDelay = "0ms";
-      texts[i].style.transitionDelay = "0ms";
-      rects[i].style.opacity = 0;
-      texts[i].style.opacity = 0;
+  function scale(f, from, to){
+    if(from === to){ return {r:f.r, g:f.g, b:f.b}; }
+    if(to === 16){ return {r:f.r*257, g:f.g*257, b:f.b*257}; }
+    return {r:Math.round(f.r/257), g:Math.round(f.g/257), b:Math.round(f.b/257)};
+  }
+  function frame(i){
+    return scale(FRAMES[i % FRAMES.length], 8, depth);
+  }
+  function light(f, upTo){
+    var v = [f.r, f.g, f.b].map(function(x, i){ return i < upTo ? x : 0; });
+    if(depth === 16){ v = v.map(function(x){ return x >> 8; }); }
+    emit.style.background = "rgb(" + v[0] + "," + v[1] + "," + v[2] + ")";
+    emit.style.boxShadow = "0 0 46px 12px rgba(" + v[0] + "," + v[1] + "," + v[2] + ",0.55)";
+  }
+  function dark(){
+    emit.style.background = "#0d0d0d";
+    emit.style.boxShadow = "none";
+  }
+  function showChip(i, on){
+    document.getElementById(CH[i].chip).classList.toggle("on", on);
+  }
+  function setChips(f){
+    var v = [f.r, f.g, f.b];
+    for(var i=0;i<3;i++){
+      document.getElementById(CH[i].bin).textContent = bits(v[i], depth);
+      document.getElementById(CH[i].dec).textContent = v[i].toLocaleString("en-US");
     }
   }
-  function allBitsOn(){
-    for(var i=0;i<N;i++){
-      rects[i].style.transitionDelay = "0ms";
-      texts[i].style.transitionDelay = "0ms";
-      rects[i].style.opacity = 1;
-      texts[i].style.opacity = 1;
-    }
-  }
 
-  // instant render, used by the manual mode
   function renderNow(f){
     cur = f;
-    var bR = toBits(f.r), bG = toBits(f.g), bB = toBits(f.b);
-    layout(bR + bG + bB);
-    setChip(0, bR, f.r); setChip(1, bG, f.g); setChip(2, bB, f.b);
-    trace.style.transition = "none";
-    trace.style.strokeDasharray = "none";
-    trace.style.strokeDashoffset = 0;
-    trace.style.opacity = 1;
-    allBitsOn();
-    for(var k=0;k<3;k++){ showChip(k,true); }
-    light(f.r, f.g, f.b);
+    V().layoutAll(f);
+    setChips(f);
+    V().showTraces();
+    V().setBits(true, false);
+    for(var k=0;k<3;k++){ showChip(k, true); }
+    light(f, 3);
   }
 
   async function play(f, myGen){
+    var v = V();
     cur = f;
-    var bR = toBits(f.r), bG = toBits(f.g), bB = toBits(f.b);
-    layout(bR + bG + bB);
-    setChip(0, bR, f.r); setChip(1, bG, f.g); setChip(2, bB, f.b);
+    v.layoutAll(f);
+    setChips(f);
 
-    clearBits();
-    trace.style.transition = "none";
-    trace.style.strokeDasharray = 1;
-    trace.style.strokeDashoffset = 1;
-    trace.style.opacity = 1;
-    for(var k=0;k<3;k++){ showChip(k,false); }
-    emit.style.background = "#0d0d0d";
-    emit.style.boxShadow = "none";
-    void trace.getBoundingClientRect();
+    v.setBits(false, false);
+    v.armTraces();
+    for(var k=0;k<3;k++){ showChip(k, false); }
+    dark();
+    void v.svg.getBoundingClientRect();
 
-    trace.style.transition = "stroke-dashoffset " + (N*BIT_MS) + "ms linear";
-    trace.style.strokeDashoffset = 0;
-    for(var i=0;i<N;i++){
-      rects[i].style.transitionDelay = (i*BIT_MS) + "ms";
-      texts[i].style.transitionDelay = (i*BIT_MS) + "ms";
-      rects[i].style.opacity = 1;
-      texts[i].style.opacity = 1;
-    }
+    v.drawTraces();
+    v.setBits(true, true);
 
-    await sleep(8*BIT_MS + 120); if(myGen !== gen) return;
-    showChip(0,true); light(f.r,0,0);
-    await sleep(8*BIT_MS);       if(myGen !== gen) return;
-    showChip(1,true); light(f.r,f.g,0);
-    await sleep(8*BIT_MS);       if(myGen !== gen) return;
-    showChip(2,true); light(f.r,f.g,f.b);
+    await sleep(v.chanMs + 110); if(myGen !== gen) return;
+    showChip(0, true); light(f, 1);
+    await sleep(v.chanMs);       if(myGen !== gen) return;
+    showChip(1, true); light(f, 2);
+    await sleep(v.chanMs);       if(myGen !== gen) return;
+    showChip(2, true); light(f, 3);
 
     await sleep(2600);           if(myGen !== gen) return;
 
-    trace.style.transition = "opacity 450ms linear";
-    trace.style.opacity = 0;
-    clearBits();
+    v.fadeTraces();
+    v.setBits(false, false);
     await sleep(700);
   }
 
   async function autoLoop(myGen){
     var i = 0;
     while(myGen === gen){
-      await play(FRAMES[i % FRAMES.length], myGen);
+      await play(frame(i), myGen);
       i++;
     }
   }
 
-  // mode switching
+  // ================= controls =================
+  var btn8    = document.getElementById("btn-8");
+  var btn16   = document.getElementById("btn-16");
   var btnAuto = document.getElementById("btn-auto");
   var btnMan  = document.getElementById("btn-man");
-  var chips   = document.getElementById("chips");
-  var sliders = [document.getElementById("sl-r"),
-                 document.getElementById("sl-g"),
-                 document.getElementById("sl-b")];
 
-  function readSliders(){
-    return {r:+sliders[0].value, g:+sliders[1].value, b:+sliders[2].value};
-  }
   sliders.forEach(function(s){
     s.addEventListener("input", function(){
       if(mode !== "manual"){ return; }
-      renderNow(readSliders());
+      renderNow({r:+sliders[0].value, g:+sliders[1].value, b:+sliders[2].value});
     });
   });
+
+  function loadSliders(f){
+    for(var i=0;i<3;i++){ sliders[i].max = V().max; }
+    sliders[0].value = f.r; sliders[1].value = f.g; sliders[2].value = f.b;
+  }
+
+  function start(){
+    gen++;
+    if(mode === "manual"){
+      loadSliders(cur);
+      renderNow(cur);
+    } else {
+      V().armTraces();
+      autoLoop(gen);
+    }
+  }
+
+  function setDepth(d){
+    if(d === depth){ return; }
+    gen++;                                  // cancels any running animation
+    var next = scale(cur, depth, d);
+    depth = d;
+    cur = next;
+    btn8.classList.toggle("on", d === 8);
+    btn16.classList.toggle("on", d === 16);
+    chips.classList.toggle("b16", d === 16);
+    V8.svg.classList.toggle("off", d !== 8);
+    V16.svg.classList.toggle("off", d !== 16);
+    result.textContent = V().result;
+    // leave the hidden view clean, so it never flashes a half drawn trace
+    (d === 8 ? V16 : V8).setBits(false, false);
+    start();
+  }
 
   function setMode(m){
     if(m === mode){ return; }
     mode = m;
-    gen++;                               // cancels any running animation
     btnAuto.classList.toggle("on", m === "auto");
     btnMan.classList.toggle("on", m === "manual");
     chips.classList.toggle("manual", m === "manual");
-
-    if(m === "manual"){
-      sliders[0].value = cur.r; sliders[1].value = cur.g; sliders[2].value = cur.b;
-      renderNow({r:cur.r, g:cur.g, b:cur.b});
-    } else {
-      trace.style.strokeDasharray = 1;
-      autoLoop(gen);
-    }
+    start();
   }
+
+  btn8.addEventListener("click",    function(){ setDepth(8); });
+  btn16.addEventListener("click",   function(){ setDepth(16); });
   btnAuto.addEventListener("click", function(){ setMode("auto"); });
   btnMan.addEventListener("click",  function(){ setMode("manual"); });
 
-  // start
+  // ================= start =================
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if(reduce){
     mode = "manual";
     btnAuto.classList.remove("on");
     btnMan.classList.add("on");
     chips.classList.add("manual");
-    renderNow({r:181, g:92, b:255});
-  } else {
-    autoLoop(gen);
   }
+  start();
 })();
 </script>
 </body>
