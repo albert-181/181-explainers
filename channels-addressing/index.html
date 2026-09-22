@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XT modules and their channels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    --display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#ffffff}
+  body{font-family:var(--body);color:#000;padding:16px 20px 20px;-webkit-font-smoothing:antialiased}
+  .stage{max-width:1400px;margin:0 auto}
+
+  .bar{display:flex;justify-content:flex-end;margin-bottom:10px}
+  .seg{display:inline-flex;border:2px solid #000}
+  .seg button{
+    font-family:var(--body);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    padding:9px 16px;background:#fff;color:#000;border:0;cursor:pointer;line-height:1;
+  }
+  .seg button + button{border-left:2px solid #000}
+  .seg button.on{background:#000;color:#fff}
+
+  svg{display:block;width:100%;height:auto}
+
+  .housing-out{fill:#171717}
+  .knurl{fill:#242424}
+  .lens-ring{fill:#2b2b2b}
+  .face{fill:#0a0a0a}
+  .strap{fill:#1c1c1c}
+  .strap-hi{fill:#2e2e2e}
+  .tab{fill:#121212}
+
+  .leader{stroke:#000;stroke-opacity:.28;stroke-width:1.4}
+  .pixlab{font-family:var(--body);font-size:12px;letter-spacing:.2em;text-anchor:middle;fill:#000}
+  .chlab{font-family:var(--body);font-size:11.5px;letter-spacing:.09em;fill:#000;fill-opacity:.55}
+  .role{font-family:var(--display);font-weight:500;font-size:16px;text-anchor:middle}
+  .val{font-family:var(--display);font-weight:500;font-size:24px;text-anchor:end;fill:#000}
+  .bar-bg{fill:#ededed;stroke:rgba(0,0,0,.18);stroke-width:1}
+  .rowrule{stroke:#000;stroke-opacity:.14;stroke-width:1}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Pixel type">
+      <button type="button" id="t-rgb" class="on">RGB</button>
+      <button type="button" id="t-rgbw">RGBW</button>
+    </div>
+  </div>
+
+  <svg id="scene" viewBox="0 0 1600 396" role="img"
+       aria-label="Three XT modules with the channel numbers and values each one listens to">
+    <defs>
+      <filter id="bloom" x="-120%" y="-120%" width="340%" height="340%">
+        <feGaussianBlur stdDeviation="11"/>
+      </filter>
+      <filter id="haze" x="-160%" y="-160%" width="420%" height="420%">
+        <feGaussianBlur stdDeviation="26"/>
+      </filter>
+    </defs>
+    <g id="world"></g>
+  </svg>
+
+</div>
+
+<script>
+(function(){
+  var NS = "http://www.w3.org/2000/svg";
+  var scene = document.getElementById("scene");
+  var world = document.getElementById("world");
+
+  var MODULES = 3;
+  var GAP = 416, X0 = 384, CY = 130;
+  var R_OUT = 80, R_KNURL = 73, R_LENS = 64, R_FACE = 55;
+  var LEDS = 6, R_LED = 34, LED_S = 18;
+  var W_SIZE = 22;                       // the white chip in the middle
+
+  var ROLE = [
+    {L:"R", c:"#e02020"},
+    {L:"G", c:"#00a03c"},
+    {L:"B", c:"#1050e0"},
+    {L:"W", c:"#c08a2a"}
+  ];
+  var WTINT = [255, 209, 163];           // roughly a 4000K white chip
+
+  var ROW_Y = [288, 326, 364, 402];
+  var BAR_X = -82, BAR_W = 150, BAR_H = 14;
+  var LAB_X = -158, ROLE_X = -104, VAL_X = 158, RULE_X = 158;
+  var H_RGB = 396, H_RGBW = 434;
+
+  var cpp = 3;
+  var phase = 0;
+
+  function el(t, a){
+    var n = document.createElementNS(NS, t);
+    for(var k in a){ n.setAttribute(k, a[k]); }
+    return n;
+  }
+  function txt(t, a){ var n = el("text", a); n.textContent = t; return n; }
+
+  function hue2rgb(h){
+    h = ((h % 360) + 360) % 360;
+    var x = 1-Math.abs((h/60)%2-1), r,g,b;
+    if(h<60){r=1;g=x;b=0;} else if(h<120){r=x;g=1;b=0;} else if(h<180){r=0;g=1;b=x;}
+    else if(h<240){r=0;g=x;b=1;} else if(h<300){r=x;g=0;b=1;} else {r=1;g=0;b=x;}
+    return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+  }
+  function rgbStr(a){
+    return "rgb(" + Math.round(a[0]) + "," + Math.round(a[1]) + "," + Math.round(a[2]) + ")";
+  }
+
+  // strap
+  world.appendChild(el("rect", {x:0, y:CY-20, width:1600, height:40, "class":"strap"}));
+  world.appendChild(el("rect", {x:0, y:CY-20, width:1600, height:4,  "class":"strap-hi"}));
+
+  var mods = [];
+
+  for(var i=0;i<MODULES;i++){
+    var cx = X0 + GAP*i;
+
+    world.appendChild(el("rect", {x:cx-R_OUT-20, y:CY-30, width:44, height:60, rx:3, "class":"tab"}));
+    world.appendChild(el("rect", {x:cx+R_OUT-24, y:CY-30, width:44, height:60, rx:3, "class":"tab"}));
+
+    var g = el("g", {transform:"translate(" + cx + "," + CY + ")"});
+
+    var haze = el("circle", {r:R_FACE, filter:"url(#haze)", opacity:"0.5"});
+    g.appendChild(haze);
+
+    g.appendChild(el("circle", {r:R_OUT, "class":"housing-out"}));
+    for(var k=0;k<24;k++){
+      g.appendChild(el("rect", {x:-4, y:-R_KNURL, width:8, height:10,
+        transform:"rotate(" + (k*15) + ")", "class":"knurl"}));
+    }
+    g.appendChild(el("circle", {r:R_LENS, "class":"lens-ring"}));
+    g.appendChild(el("circle", {r:R_FACE, "class":"face"}));
+
+    // glow layer: the six colour chips plus the white one in the middle
+    var bloomGrp = el("g", {filter:"url(#bloom)", opacity:"0.9"});
+    var blooms = [], chips = [];
+    for(var j=0;j<LEDS;j++){
+      var tf = "rotate(" + (j*360/LEDS) + ") translate(0," + (-R_LED) + ")";
+      var bl = el("rect", {x:-LED_S*0.85, y:-LED_S*0.85, width:LED_S*1.7, height:LED_S*1.7, transform:tf});
+      bloomGrp.appendChild(bl); blooms.push(bl);
+    }
+    var wBloom = el("rect", {x:-W_SIZE*0.85, y:-W_SIZE*0.85, width:W_SIZE*1.7, height:W_SIZE*1.7, "class":"hidden"});
+    bloomGrp.appendChild(wBloom);
+    g.appendChild(bloomGrp);
+
+    for(var j=0;j<LEDS;j++){
+      var tf2 = "rotate(" + (j*360/LEDS) + ") translate(0," + (-R_LED) + ")";
+      var c = el("rect", {x:-LED_S/2, y:-LED_S/2, width:LED_S, height:LED_S, transform:tf2});
+      g.appendChild(c); chips.push(c);
+    }
+    var wChip = el("rect", {x:-W_SIZE/2, y:-W_SIZE/2, width:W_SIZE, height:W_SIZE, "class":"hidden"});
+    g.appendChild(wChip);
+
+    world.appendChild(g);
+
+    world.appendChild(el("line", {x1:cx, y1:CY+R_OUT+6, x2:cx, y2:246, "class":"leader"}));
+    world.appendChild(txt("PIXEL " + (i+1), {x:cx, y:266, "class":"pixlab"}));
+
+    // four rows, the fourth hidden until RGBW
+    var rows = [], fills = [], nums = [], labs = [];
+    for(var r=0;r<4;r++){
+      var y = ROW_Y[r];
+      var rg = el("g", r === 3 ? {"class":"hidden"} : {});
+
+      rg.appendChild(el("line", {x1:cx+(-RULE_X), y1:y+14, x2:cx+RULE_X, y2:y+14, "class":"rowrule"}));
+      var lab = txt("", {x:cx+LAB_X, y:y+5, "class":"chlab"});
+      rg.appendChild(lab); labs.push(lab);
+      rg.appendChild(txt(ROLE[r].L, {x:cx+ROLE_X, y:y+6, "class":"role", fill:ROLE[r].c}));
+      rg.appendChild(el("rect", {x:cx+BAR_X, y:y-7, width:BAR_W, height:BAR_H, "class":"bar-bg"}));
+      var f = el("rect", {x:cx+BAR_X, y:y-7, width:0, height:BAR_H, fill:ROLE[r].c});
+      rg.appendChild(f); fills.push(f);
+      var n = txt("0", {x:cx+VAL_X, y:y+8, "class":"val"});
+      rg.appendChild(n); nums.push(n);
+
+      world.appendChild(rg); rows.push(rg);
+    }
+
+    mods.push({chips:chips, blooms:blooms, haze:haze, wChip:wChip, wBloom:wBloom,
+               rows:rows, fills:fills, nums:nums, labs:labs, index:i});
+  }
+
+  function relabel(){
+    for(var i=0;i<MODULES;i++){
+      var m = mods[i];
+      for(var r=0;r<4;r++){
+        m.labs[r].textContent = "CH " + (i*cpp + r + 1);
+      }
+      m.rows[3].setAttribute("class", cpp === 4 ? "" : "hidden");
+      m.wChip.setAttribute("class", cpp === 4 ? "" : "hidden");
+      m.wBloom.setAttribute("class", cpp === 4 ? "" : "hidden");
+    }
+    scene.setAttribute("viewBox", "0 0 1600 " + (cpp === 4 ? H_RGBW : H_RGB));
+  }
+
+  var STEP_MODULE = 70;
+  var SPEED = 34;
+
+  function paint(ph){
+    for(var i=0;i<mods.length;i++){
+      var m = mods[i];
+      var rgb = hue2rgb(ph + i*STEP_MODULE);
+      var col = rgbStr(rgb);
+
+      for(var j=0;j<m.chips.length;j++){
+        m.chips[j].setAttribute("fill", col);
+        m.blooms[j].setAttribute("fill", col);
+      }
+
+      var out = [rgb[0], rgb[1], rgb[2]];
+      var w = 0;
+
+      if(cpp === 4){
+        // a slow pulse on the white channel so the fourth one is doing something
+        w = Math.round(70 + 70*Math.sin((ph + i*STEP_MODULE) / 41));
+        var f = Math.pow(w/255, 0.55);
+        var wc = [8 + WTINT[0]*f, 8 + WTINT[1]*f, 8 + WTINT[2]*f];
+        m.wChip.setAttribute("fill", rgbStr(wc));
+        m.wBloom.setAttribute("fill", rgbStr([WTINT[0]*w/255, WTINT[1]*w/255, WTINT[2]*w/255]));
+        out[0] = Math.min(255, out[0] + WTINT[0]*w/255);
+        out[1] = Math.min(255, out[1] + WTINT[1]*w/255);
+        out[2] = Math.min(255, out[2] + WTINT[2]*w/255);
+      }
+
+      m.haze.setAttribute("fill", rgbStr(out));
+
+      var vals = [rgb[0], rgb[1], rgb[2], w];
+      for(var r=0;r<cpp;r++){
+        m.fills[r].setAttribute("width", (BAR_W * vals[r] / 255).toFixed(1));
+        var s = String(vals[r]);
+        if(m.nums[r].textContent !== s){ m.nums[r].textContent = s; }
+      }
+    }
+  }
+
+  // toggle
+  var tRgb = document.getElementById("t-rgb");
+  var tRgbw = document.getElementById("t-rgbw");
+  function setType(n){
+    cpp = n;
+    tRgb.classList.toggle("on", n === 3);
+    tRgbw.classList.toggle("on", n === 4);
+    relabel();
+    paint(phase);
+  }
+  tRgb.addEventListener("click", function(){ setType(3); });
+  tRgbw.addEventListener("click", function(){ setType(4); });
+
+  relabel();
+
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce){
+    paint(0);
+  } else {
+    var t0 = performance.now();
+    setInterval(function(){
+      phase = ((performance.now() - t0)/1000) * SPEED;
+      paint(phase);
+    }, 80);
+    paint(0);
+  }
+})();
+</script>
+</body>
+</html>
