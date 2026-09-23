@@ -59,6 +59,11 @@
     font-family:var(--display);font-weight:500;font-size:13px;letter-spacing:.08em;white-space:nowrap;
   }
   .panel .spec{font-size:11px;line-height:1.5;margin-top:4px;opacity:.8}
+  .panel .note{font-size:10px;line-height:1.4;margin-top:8px;opacity:.7}
+
+  .seg.mini{border-width:1.5px;flex:0 0 auto}
+  .seg.mini button{font-size:9px;letter-spacing:.14em;padding:5px 8px}
+  .seg.mini button + button{border-left-width:1.5px}
 
   .ch-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(62px,1fr));gap:10px 12px;margin-top:12px}
   .ch .lab{font-size:9px;letter-spacing:.14em;text-transform:uppercase;line-height:1.6;white-space:nowrap}
@@ -159,11 +164,18 @@
       spec:"Fixed 3000K. One channel, so the only thing you can change is how bright it is.",
       chans:[{id:"d", lab:"Dim", col:K3000, init:100}]
     },
-    tw: {
-      name:"Tunable white", count:"2 CH",
+    tw2: {
+      name:"Tunable white", count:"2 CH", tw:true,
       spec:"A warm and a cool chip in one package. Mix them to land anywhere between 2700K and 6500K.",
-      chans:[{id:"ww", lab:"Warm", col:K2700, init:100},
-             {id:"cw", lab:"Cool", col:K6500, init:25}]
+      chans:[{id:"ww", lab:"Warm", col:K2700, k:2700, init:100},
+             {id:"cw", lab:"Cool", col:K6500, k:6500, init:25}]
+    },
+    tw3: {
+      name:"Tunable white", count:"3 CH", tw:true, note:true,
+      spec:"Warm, neutral and cool on one three channel IC. The same white range, with the middle of the curve under its own control.",
+      chans:[{id:"ww", lab:"Warm",    col:K2700, k:2700, init:70},
+             {id:"nw", lab:"Neutral", col:K4000, k:4000, init:55},
+             {id:"cw", lab:"Cool",    col:K6500, k:6500, init:20}]
     },
     rgb: {
       name:"RGB", count:"3 CH",
@@ -181,7 +193,7 @@
              {id:"w", lab:"White", col:K4000,     init:85}]
     },
     rgbtw: {
-      name:"RGB + TW", count:"5 CH",
+      name:"RGB + TW", count:"5 CH", note:true,
       spec:"Full color and tunable white in one pixel. The most you can ask of a fixture, and the most data per pixel.",
       chans:[{id:"r",  lab:"Red",   col:[255,0,0], init:15},
              {id:"g",  lab:"Green", col:[0,255,0], init:0},
@@ -191,12 +203,19 @@
     }
   };
 
-  var ORDER = ["sw","tw","rgb","rgbw","rgbtw"];
-  var active = "rgbtw";
+  var PANELS = ["sw","tw","rgb","rgbw","rgbtw"];      // one panel per column entry
+  var KEYS   = ["sw","tw2","tw3","rgb","rgbw","rgbtw"];
+  var NOTE   = "*Only available for DiGi LED Strips";
+
+  var active = "rgbtw";      // which panel is on
+  var twCh = 2;              // the tunable white panel shows 2 or 3 channels
   var diffused = true;
   var level = {};
 
-  ORDER.forEach(function(t){
+  // the tunable white panel stands for whichever of its two variants is picked
+  function keyOf(panel){ return panel === "tw" ? ("tw" + twCh) : panel; }
+
+  KEYS.forEach(function(t){
     level[t] = {};
     TECH[t].chans.forEach(function(c){ level[t][c.id] = c.init; });
   });
@@ -246,40 +265,63 @@
   }
 
   // ---------- panels ----------
-  function buildPanel(t){
-    var p = document.getElementById("p-" + t);
+  function buildPanel(panel){
+    var p = document.getElementById("p-" + panel);
+    var t = keyOf(panel);
     var d = TECH[t];
-    var html = '<div class="head"><span class="name">' + d.name + '</span>' +
-               '<span class="count">' + d.count + '</span></div>' +
+
+    var right = d.tw
+      ? '<span class="seg mini" role="group" aria-label="Tunable white channels">' +
+          '<button type="button" data-tw="2"' + (twCh === 2 ? ' class="on"' : '') + '>2 CH</button>' +
+          '<button type="button" data-tw="3"' + (twCh === 3 ? ' class="on"' : '') + '>3 CH</button>' +
+        '</span>'
+      : '<span class="count">' + d.count + '</span>';
+
+    var html = '<div class="head"><span class="name">' + d.name + '</span>' + right + '</div>' +
                '<div class="ch-row">';
     d.chans.forEach(function(c){
+      var v = level[t][c.id];
       html += '<div class="ch">' +
                 '<div class="lab"><span class="swatch" style="background:' + rgbStr(c.col) + '"></span>' + c.lab + '</div>' +
-                '<input type="range" min="0" max="100" value="' + c.init + '" ' +
-                  'data-tech="' + t + '" data-chan="' + c.id + '" ' +
+                '<input type="range" min="0" max="100" value="' + v + '" ' +
+                  'data-chan="' + c.id + '" ' +
                   'style="--c:' + rgbStr(c.col) + '" aria-label="' + d.name + ' ' + c.lab + '">' +
-                '<div class="val" id="v-' + t + '-' + c.id + '">' + c.init + '%</div>' +
+                '<div class="val" id="v-' + panel + '-' + c.id + '">' + v + '%</div>' +
               '</div>';
     });
     html += '</div>';
+    if(d.note){ html += '<div class="note">' + NOTE + '</div>'; }
     p.innerHTML = html;
 
-    p.addEventListener("click", function(){ setActive(t); });
     Array.prototype.forEach.call(p.querySelectorAll("input[type=range]"), function(s){
       s.addEventListener("input", function(){
-        setActive(t);
-        level[t][s.dataset.chan] = +s.value;
-        document.getElementById("v-" + t + "-" + s.dataset.chan).textContent = s.value + "%";
+        setActive(panel);
+        level[keyOf(panel)][s.dataset.chan] = +s.value;
+        document.getElementById("v-" + panel + "-" + s.dataset.chan).textContent = s.value + "%";
+        render();
+      });
+    });
+    Array.prototype.forEach.call(p.querySelectorAll("button[data-tw]"), function(b){
+      b.addEventListener("click", function(){
+        setActive(panel);
+        var n = +b.dataset.tw;
+        if(n === twCh){ return; }
+        twCh = n;
+        buildPanel(panel);
+        buildModule();
         render();
       });
     });
   }
-  ORDER.forEach(buildPanel);
+  PANELS.forEach(function(panel){
+    document.getElementById("p-" + panel).addEventListener("click", function(){ setActive(panel); });
+    buildPanel(panel);
+  });
 
   function setActive(t){
     if(active === t){ return; }
     active = t;
-    ORDER.forEach(function(k){
+    PANELS.forEach(function(k){
       document.getElementById("p-" + k).classList.toggle("on", k === t);
     });
     buildModule();
@@ -319,7 +361,7 @@
     pool = el("circle", {cx:cx, cy:cy, r:74, filter:"url(#lens)"});
     mod.appendChild(pool);
 
-    var chans = TECH[active].chans;
+    var chans = TECH[keyOf(active)].chans;
     var n = chans.length;
     var S = SIZES[n].s, G = SIZES[n].g;
     var totalW = n*S + (n-1)*G;
@@ -341,7 +383,7 @@
   }
 
   function render(){
-    var t = active;
+    var t = keyOf(active);
     var chans = TECH[t].chans;
     var m = mix(t);
 
@@ -370,12 +412,16 @@
 
   function subLine(t){
     if(t === "sw"){ return "3000K · " + level.sw.d + "% output"; }
-    if(t === "tw"){
-      var w = level.tw.ww, c = level.tw.cw;
-      if(w + c === 0){ return "off"; }
-      // two sources blend close to linearly in mired, not in kelvin
-      var mired = (1e6/2700*w + 1e6/6500*c) / (w + c);
-      var k = Math.round((1e6/mired) / 50) * 50;
+    if(TECH[t].tw){
+      // white sources blend close to linearly in mired, not in kelvin
+      var sum = 0, mired = 0;
+      TECH[t].chans.forEach(function(c){
+        var L = level[t][c.id];
+        sum += L;
+        mired += (1e6 / c.k) * L;
+      });
+      if(sum === 0){ return "off"; }
+      var k = Math.round((1e6 / (mired / sum)) / 50) * 50;
       return "approx " + k + "K";
     }
     return TECH[t].chans.map(function(ch){
@@ -395,7 +441,7 @@
   bChips.addEventListener("click", function(){ setLens(false); });
   bDiff.addEventListener("click",  function(){ setLens(true); });
 
-  ORDER.forEach(function(k){
+  PANELS.forEach(function(k){
     document.getElementById("p-" + k).classList.toggle("on", k === active);
   });
   buildModule();
