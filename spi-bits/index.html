@@ -75,13 +75,9 @@
 
   .pixelbox{display:flex;align-items:center;gap:16px;flex:0 0 auto;padding-top:4px}
   .pixel{width:118px;height:118px;position:relative;flex:0 0 auto}
-  .emit{position:absolute;inset:0;background:#0d0d0d;transition:background .4s linear,box-shadow .4s linear}
+  .emit{position:absolute;inset:0;background:#0d0d0d;transition:background .1s linear,box-shadow .1s linear}
   .pixelbox .cap{font-size:10px;letter-spacing:.2em;text-transform:uppercase;line-height:1.7;max-width:110px}
 
-  .result{
-    font-family:var(--display);font-weight:500;
-    font-size:clamp(20px,2.6vw,34px);line-height:1.05;letter-spacing:-.02em;
-  }
 
   @media (max-width:700px){
     .wrap{padding:18px 16px}
@@ -138,10 +134,6 @@
     </div>
   </div>
 
-  <div class="rule thin"></div>
-
-  <div class="result" id="result">24 bits per pixel. 256 levels per channel. 16.7 million colors.</div>
-
 </div>
 
 <script>
@@ -158,7 +150,6 @@
     while(s.length < n){ s = "0" + s; }
     return s;
   }
-  function sleep(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
 
   var CH = [
     {wide:"RED",   narrow:"R", color:"#e02020", bin:"bin-r", dec:"dec-r", chip:"chip-r"},
@@ -166,14 +157,18 @@
     {wide:"BLUE",  narrow:"B", color:"#1050e0", bin:"bin-b", dec:"dec-b", chip:"chip-b"}
   ];
 
-  // the same five colors in both depths, the 16 bit values are the 8 bit ones times 257
-  var FRAMES = [
-    {r:181, g:92,  b:255},
-    {r:255, g:176, b:0},
-    {r:0,   g:190, b:160},
-    {r:255, g:40,  b:90},
-    {r:40,  g:120, b:255}
-  ];
+  // the auto ramp is continuous: black up through red to white and back
+  var CYCLE_MS = 10000;      // one full trip
+  var AUTO_FPS = 14;         // how many values a second are put on the wire
+
+  function rampColor(L){
+    var m = V().max;
+    if(L <= 0.5){
+      return {r:Math.round(m * L*2), g:0, b:0};
+    }
+    var t = (L - 0.5) * 2;
+    return {r:m, g:Math.round(m*t), b:Math.round(m*t)};
+  }
 
   // ================= 8 bit: one row of 24 pulses, grouped per channel =================
   function build8(){
@@ -212,8 +207,8 @@
       svg: svg,
       depth: 8,
       max: 255,
+      step: 51,
       chanMs: 8 * BIT_MS,
-      result: "24 bits per pixel. 256 levels per channel. 16.7 million colors.",
 
       layoutAll: function(f){
         var s = bits(f.r,8) + bits(f.g,8) + bits(f.b,8);
@@ -322,8 +317,8 @@
       svg: svg,
       depth: 16,
       max: 65535,
+      step: 1,
       chanMs: ROW_MS,
-      result: "48 bits per pixel. 65,536 levels per channel. 281 trillion colors.",
 
       layoutAll: function(f){
         layoutRow(0, bits(f.r,16));
@@ -380,7 +375,6 @@
   // ================= shared state =================
   var emit    = document.getElementById("emit");
   var chips   = document.getElementById("chips");
-  var result  = document.getElementById("result");
   var sliders = [document.getElementById("sl-r"),
                  document.getElementById("sl-g"),
                  document.getElementById("sl-b")];
@@ -394,12 +388,10 @@
     if(to === 16){ return {r:f.r*257, g:f.g*257, b:f.b*257}; }
     return {r:Math.round(f.r/257), g:Math.round(f.g/257), b:Math.round(f.b/257)};
   }
-  function frame(i){
-    return scale(FRAMES[i % FRAMES.length], 8, depth);
-  }
   function light(f, upTo){
     var v = [f.r, f.g, f.b].map(function(x, i){ return i < upTo ? x : 0; });
     if(depth === 16){ v = v.map(function(x){ return x >> 8; }); }
+    if(v[0] + v[1] + v[2] === 0){ dark(); return; }
     emit.style.background = "rgb(" + v[0] + "," + v[1] + "," + v[2] + ")";
     emit.style.boxShadow = "0 0 46px 12px rgba(" + v[0] + "," + v[1] + "," + v[2] + ",0.55)";
   }
@@ -428,41 +420,17 @@
     light(f, 3);
   }
 
-  async function play(f, myGen){
-    var v = V();
-    cur = f;
-    v.layoutAll(f);
-    setChips(f);
-
-    v.setBits(false, false);
-    v.armTraces();
-    for(var k=0;k<3;k++){ showChip(k, false); }
-    dark();
-    void v.svg.getBoundingClientRect();
-
-    v.drawTraces();
-    v.setBits(true, true);
-
-    await sleep(v.chanMs + 110); if(myGen !== gen) return;
-    showChip(0, true); light(f, 1);
-    await sleep(v.chanMs);       if(myGen !== gen) return;
-    showChip(1, true); light(f, 2);
-    await sleep(v.chanMs);       if(myGen !== gen) return;
-    showChip(2, true); light(f, 3);
-
-    await sleep(2600);           if(myGen !== gen) return;
-
-    v.fadeTraces();
-    v.setBits(false, false);
-    await sleep(700);
-  }
-
-  async function autoLoop(myGen){
-    var i = 0;
-    while(myGen === gen){
-      await play(frame(i), myGen);
-      i++;
+  function autoLoop(myGen){
+    var t0 = null;
+    function step(ts){
+      if(myGen !== gen){ return; }
+      if(t0 === null){ t0 = ts; }
+      var u = (((ts - t0) % CYCLE_MS) / CYCLE_MS);
+      var L = u < 0.5 ? u*2 : (1-u)*2;      // 0 to 1 and back
+      renderNow(rampColor(L));
+      setTimeout(function(){ requestAnimationFrame(step); }, 1000/AUTO_FPS);
     }
+    requestAnimationFrame(step);
   }
 
   // ================= controls =================
@@ -479,7 +447,10 @@
   });
 
   function loadSliders(f){
-    for(var i=0;i<3;i++){ sliders[i].max = V().max; }
+    for(var i=0;i<3;i++){
+      sliders[i].max = V().max;
+      sliders[i].step = V().step;       // 8 bit is stepped on purpose, 16 bit is not
+    }
     sliders[0].value = f.r; sliders[1].value = f.g; sliders[2].value = f.b;
   }
 
@@ -489,7 +460,6 @@
       loadSliders(cur);
       renderNow(cur);
     } else {
-      V().armTraces();
       autoLoop(gen);
     }
   }
@@ -505,7 +475,6 @@
     chips.classList.toggle("b16", d === 16);
     V8.svg.classList.toggle("off", d !== 8);
     V16.svg.classList.toggle("off", d !== 16);
-    result.textContent = V().result;
     // leave the hidden view clean, so it never flashes a half drawn trace
     (d === 8 ? V16 : V8).setBits(false, false);
     start();
