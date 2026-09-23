@@ -44,6 +44,19 @@
   .bar-bg{fill:#ededed;stroke:rgba(0,0,0,.18);stroke-width:1}
   .rowrule{stroke:#000;stroke-opacity:.14;stroke-width:1}
   .hidden{display:none}
+
+  /* the serial data chain */
+  .zone{fill:#000;opacity:.045}
+  .zonelab{font-family:var(--body);font-size:12px;letter-spacing:.2em;text-anchor:middle;fill:#000}
+  .chaintag{font-family:var(--body);font-size:11px;letter-spacing:.26em;fill:#000;fill-opacity:.55}
+  .bitcell{stroke:#000;stroke-opacity:.10;stroke-width:1}
+  .bitch{stroke:#000;stroke-opacity:.30;stroke-width:1}
+  .bitpix{stroke:#000;stroke-opacity:.55;stroke-width:1.5}
+  .bittrace{fill:none;stroke:#000;stroke-width:1.2;stroke-linejoin:miter;stroke-linecap:square}
+  .bitfill{fill:#000080}
+  .bitdigit{font-family:var(--display);font-weight:500;text-anchor:middle;fill:#000}
+  .grprule{stroke-width:3}
+  .grplab{font-family:var(--display);font-weight:500;font-size:13px;text-anchor:middle}
 </style>
 </head>
 <body>
@@ -53,6 +66,9 @@
     <div class="seg" role="group" aria-label="Pixel type">
       <button type="button" id="t-rgb" class="on">RGB</button>
       <button type="button" id="t-rgbw">RGBW</button>
+    </div>
+    <div class="seg" style="margin-left:10px">
+      <button type="button" id="t-bits" aria-pressed="false">Data chain</button>
     </div>
   </div>
 
@@ -105,6 +121,11 @@
     return n;
   }
   function txt(t, a){ var n = el("text", a); n.textContent = t; return n; }
+  function bin8(v){
+    var s = (v & 255).toString(2);
+    while(s.length < 8){ s = "0" + s; }
+    return s;
+  }
 
   function hue2rgb(h){
     h = ((h % 360) + 360) % 360;
@@ -190,6 +211,93 @@
                rows:rows, fills:fills, nums:nums, labs:labs, index:i});
   }
 
+  // ================= the serial data chain =================
+  // every channel of pixel 1, then every channel of pixel 2, in the order they
+  // actually leave the controller
+  var CHAIN_H = 176;
+  var showBits = false;
+  var chainG = el("g", {"class":"hidden"});
+  world.appendChild(chainG);
+  var chain = null;
+
+  function buildChain(){
+    while(chainG.firstChild){ chainG.removeChild(chainG.firstChild); }
+
+    var base = (cpp === 4 ? H_RGBW : H_RGB);
+    var CT   = base + 16;
+    var CX0  = 40, CW = 1520;
+    var perPix = cpp * 8;
+    var N  = MODULES * perPix;
+    var W  = CW / N;
+    var H1 = W * 0.74, H0 = W * 0.18;
+    var YH = CT + 52, YL = CT + 112;
+    var DY = CT + 42;
+
+    chainG.appendChild(txt("DATA CHAIN", {x:CX0, y:CT - 4, "class":"chaintag"}));
+
+    // one band per pixel
+    for(var i=0;i<MODULES;i++){
+      var zx = CX0 + i*perPix*W;
+      chainG.appendChild(el("rect", {x:zx + 2, y:CT + 22, width:perPix*W - 4, height:128, "class":"zone"}));
+      chainG.appendChild(txt("PIXEL " + (i+1), {x:zx + perPix*W/2, y:CT + 14, "class":"zonelab"}));
+    }
+
+    // cell lines, heavier at each channel and heavier again at each pixel
+    for(var c=0;c<=N;c++){
+      var x = CX0 + c*W;
+      var cls = (c % perPix === 0) ? "bitpix" : ((c % 8 === 0) ? "bitch" : "bitcell");
+      chainG.appendChild(el("line", {x1:x, y1:CT + 34, x2:x, y2:YL + 8, "class":cls}));
+    }
+
+    // which channel each group of eight belongs to
+    for(var g=0; g<MODULES*cpp; g++){
+      var gx = CX0 + g*8*W, gw = 8*W;
+      var role = ROLE[g % cpp];
+      chainG.appendChild(el("line", {x1:gx + 3, y1:CT + 126, x2:gx + gw - 3, y2:CT + 126,
+        stroke:role.c, "class":"grprule"}));
+      chainG.appendChild(txt(role.L, {x:gx + gw/2, y:CT + 145, "class":"grplab", fill:role.c}));
+    }
+
+    var trace = el("path", {"class":"bittrace"});
+    chainG.appendChild(trace);
+
+    var rects = [], texts = [];
+    var fs = Math.min(12, W * 0.54);
+    for(var b=0;b<N;b++){
+      var bx = CX0 + b*W;
+      var r = el("rect", {x:bx, y:YH, width:H1, height:YL-YH, "class":"bitfill"});
+      chainG.appendChild(r); rects.push(r);
+      var t = el("text", {x:bx, y:DY, "class":"bitdigit", "font-size":fs.toFixed(1)});
+      t.textContent = "0";
+      chainG.appendChild(t); texts.push(t);
+    }
+
+    chain = {rects:rects, texts:texts, trace:trace,
+             N:N, X0:CX0, W:W, H1:H1, H0:H0, YH:YH, YL:YL};
+  }
+
+  function paintChain(all){
+    if(!chain){ return; }
+    var s = "";
+    for(var i=0;i<MODULES;i++){
+      for(var r=0;r<cpp;r++){ s += bin8(all[i][r]); }
+    }
+    var d = "M 0," + chain.YL;
+    for(var b=0;b<chain.N;b++){
+      var x = chain.X0 + b*chain.W;
+      var h = (s.charAt(b) === "1") ? chain.H1 : chain.H0;
+      d += " L " + x.toFixed(1) + "," + chain.YL +
+           " L " + x.toFixed(1) + "," + chain.YH +
+           " L " + (x+h).toFixed(1) + "," + chain.YH +
+           " L " + (x+h).toFixed(1) + "," + chain.YL;
+      chain.rects[b].setAttribute("width", h.toFixed(1));
+      chain.texts[b].setAttribute("x", (x + h/2).toFixed(1));
+      if(chain.texts[b].textContent !== s.charAt(b)){ chain.texts[b].textContent = s.charAt(b); }
+    }
+    d += " L 1600," + chain.YL;
+    chain.trace.setAttribute("d", d);
+  }
+
   function relabel(){
     for(var i=0;i<MODULES;i++){
       var m = mods[i];
@@ -200,13 +308,17 @@
       m.wChip.setAttribute("class", cpp === 4 ? "" : "hidden");
       m.wBloom.setAttribute("class", cpp === 4 ? "" : "hidden");
     }
-    scene.setAttribute("viewBox", "0 0 1600 " + (cpp === 4 ? H_RGBW : H_RGB));
+    var h = (cpp === 4 ? H_RGBW : H_RGB) + (showBits ? CHAIN_H : 0);
+    scene.setAttribute("viewBox", "0 0 1600 " + h);
+    chainG.setAttribute("class", showBits ? "" : "hidden");
+    if(showBits){ buildChain(); }
   }
 
   var STEP_MODULE = 70;
   var SPEED = 34;
 
   function paint(ph){
+    var all = [];
     for(var i=0;i<mods.length;i++){
       var m = mods[i];
       var rgb = hue2rgb(ph + i*STEP_MODULE);
@@ -240,7 +352,9 @@
         var s = String(vals[r]);
         if(m.nums[r].textContent !== s){ m.nums[r].textContent = s; }
       }
+      all.push(vals);
     }
+    if(showBits){ paintChain(all); }
   }
 
   // toggle
@@ -255,6 +369,15 @@
   }
   tRgb.addEventListener("click", function(){ setType(3); });
   tRgbw.addEventListener("click", function(){ setType(4); });
+
+  var tBits = document.getElementById("t-bits");
+  tBits.addEventListener("click", function(){
+    showBits = !showBits;
+    tBits.classList.toggle("on", showBits);
+    tBits.setAttribute("aria-pressed", showBits ? "true" : "false");
+    relabel();
+    paint(phase);
+  });
 
   relabel();
 
