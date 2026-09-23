@@ -9,10 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --black:
-#000000;
-    --white:
-#ffffff;
+    --black:#000000;
+    --white:#ffffff;
     --display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
     --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
   }
@@ -87,8 +85,7 @@
   #stage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
   #stage svg{display:block;width:100%;max-width:340px;height:auto}
   .readout{text-align:center}
-  .outbar{width:150px;height:16px;margin:0 auto 8px;background:
-#0a0a0a;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+  .outbar{width:150px;height:16px;margin:0 auto 8px;background:#0a0a0a;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
   .readout .big{
     font-family:var(--display);font-weight:500;
     font-size:clamp(20px,2.3vw,30px);line-height:1.05;letter-spacing:-.01em;
@@ -310,17 +307,13 @@
     mod.appendChild(haze);
 
     // housing
-    mod.appendChild(el("circle", {cx:cx, cy:cy, r:112, fill:"
-#171717"}));
+    mod.appendChild(el("circle", {cx:cx, cy:cy, r:112, fill:"#171717"}));
     for(var k=0;k<28;k++){
-      mod.appendChild(el("rect", {x:-5, y:-105, width:10, height:12, fill:"
-#242424",
+      mod.appendChild(el("rect", {x:-5, y:-105, width:10, height:12, fill:"#242424",
         transform:"translate(" + cx + "," + cy + ") rotate(" + (k*360/28) + ")"}));
     }
-    mod.appendChild(el("circle", {cx:cx, cy:cy, r:96, fill:"
-#2b2b2b"}));
-    mod.appendChild(el("circle", {cx:cx, cy:cy, r:82, fill:"
-#080808"}));
+    mod.appendChild(el("circle", {cx:cx, cy:cy, r:96, fill:"#2b2b2b"}));
+    mod.appendChild(el("circle", {cx:cx, cy:cy, r:82, fill:"#080808"}));
 
     // the diffused output of the whole pixel
     pool = el("circle", {cx:cx, cy:cy, r:74, filter:"url(#lens)"});
