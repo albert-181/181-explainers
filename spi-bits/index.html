@@ -207,7 +207,7 @@
       svg: svg,
       depth: 8,
       max: 255,
-      step: 51,
+      step: 1,
       chanMs: 8 * BIT_MS,
 
       layoutAll: function(f){
@@ -449,7 +449,7 @@
   function loadSliders(f){
     for(var i=0;i<3;i++){
       sliders[i].max = V().max;
-      sliders[i].step = V().step;       // 8 bit is stepped on purpose, 16 bit is not
+      sliders[i].step = V().step;
     }
     sliders[0].value = f.r; sliders[1].value = f.g; sliders[2].value = f.b;
   }
