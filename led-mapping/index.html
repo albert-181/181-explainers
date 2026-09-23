@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LED mapping</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --black:#000000;
+    --blue:#000080;
+    --display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
+    --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:transparent;height:100%;overflow:hidden}
+
+  /* drawn once at 1280 x 720, then scaled to fit the frame it sits in */
+  #fit{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:50% 50%}
+  svg{display:block;width:1280px;height:720px}
+
+  .case{fill:#171717}
+  .inset{fill:#050505}
+  .hair{stroke:var(--black);stroke-width:1.5;fill:none}
+  .blue{stroke:var(--blue);stroke-width:2;fill:none}
+
+  .name{font-family:var(--display);font-weight:500;font-size:20px;letter-spacing:.12em;fill:var(--black)}
+  .tag{font-family:var(--body);font-size:12px;letter-spacing:.26em;fill:var(--black);opacity:.55}
+  .tagb{font-family:var(--body);font-size:12px;letter-spacing:.26em;fill:var(--blue)}
+  .pick{font-family:var(--body);font-size:13px;letter-spacing:.22em;fill:var(--black);cursor:pointer}
+  .hit{fill:transparent;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="fit">
+  <svg id="scene" viewBox="0 0 1280 720" role="img"
+       aria-label="Content generated in mapping software on the left, sent as Art-Net or sACN to pixels and linear fixtures on the right, which sit at the mapped x y coordinates"></svg>
+</div>
+
+<script>
+(function(){
+  var NS = "http://www.w3.org/2000/svg";
+  var svg = document.getElementById("scene");
+  var NET = "#000080";
+  var TAU = Math.PI * 2;
+
+  function el(t, a, parent){
+    var n = document.createElementNS(NS, t);
+    for(var k in a){ n.setAttribute(k, a[k]); }
+    (parent || svg).appendChild(n);
+    return n;
+  }
+  function txt(x, y, s, cls, anchor, parent){
+    var n = el("text", {x:x, y:y, "class":cls}, parent);
+    if(anchor){ n.setAttribute("text-anchor", anchor); }
+    n.textContent = s;
+    return n;
+  }
+  function hex(h){
+    return [parseInt(h.substr(1,2),16), parseInt(h.substr(3,2),16), parseInt(h.substr(5,2),16)];
+  }
+  function lerp3(A, B, f){
+    return [A[0]+(B[0]-A[0])*f, A[1]+(B[1]-A[1])*f, A[2]+(B[2]-A[2])*f];
+  }
+  function css(c){
+    return "rgb(" + Math.round(c[0]) + "," + Math.round(c[1]) + "," + Math.round(c[2]) + ")";
+  }
+
+  // ---------- geometry: software left, fixtures right ----------
+  var SX = 46,  SY = 140, SW = 520, SH = 340;     // the screen
+  var RX = 760, RY = 180, RW = 460, RH = 330;     // the real world
+  var PAD = 30;
+
+  // ---------- the three contents ----------
+  var PRESETS = [
+    {
+      label:"SUNSET",
+      kind:"ramp",                              // one soft ramp, drifting
+      stops:["#92A8DC","#A797D2","#C892BC","#E4919B","#F3AE92","#F9CDA8","#FCE6CB"],
+      dir:[0,1],                                // top to bottom
+      span:0.70, off:0.15, amp:0.15, freq:0.050
+    },
+    {
+      label:"TUNABLE WHITE",
+      kind:"flow",                              // a gentle cycle travelling down
+      stops:["#FFBE74","#FFD79F","#FFEDD2","#FFFAF3","#F1F6FE","#D7E7FE","#B6D5FF",
+             "#D7E7FE","#F1F6FE","#FFFAF3","#FFEDD2","#FFD79F"],
+      angle0:Math.PI/2, rot:0, repeats:1.15, speed:0.075
+    },
+    {
+      label:"PINK / BLUE",
+      kind:"cloud",                             // soft clouds drifting over each other
+      base:"#8C9FEF",
+      blobs:[
+        {c:"#FF4C9E", a:0.90, r:195, rA:45, x:0.26, y:0.34, ax:0.30, ay:0.26, fx:0.033, fy:0.026, px:0.0,  py:1.9},
+        {c:"#ED5ADD", a:0.84, r:235, rA:55, x:0.70, y:0.28, ax:0.26, ay:0.30, fx:0.024, fy:0.037, px:2.4,  py:0.6},
+        {c:"#3F76F7", a:0.92, r:215, rA:50, x:0.72, y:0.72, ax:0.31, ay:0.24, fx:0.040, fy:0.029, px:4.1,  py:3.3},
+        {c:"#3FCEEF", a:0.86, r:185, rA:40, x:0.30, y:0.76, ax:0.28, ay:0.27, fx:0.029, fy:0.044, px:1.2,  py:5.0},
+        {c:"#FF8FC8", a:0.70, r:260, rA:60, x:0.50, y:0.50, ax:0.34, ay:0.30, fx:0.020, fy:0.034, px:5.4,  py:2.2}
+      ]
+    }
+  ];
+  PRESETS.forEach(function(P){
+    if(P.stops){ P.rgb = P.stops.map(hex); }
+    if(P.base){ P.baseRgb = hex(P.base); }
+    if(P.blobs){ P.blobs.forEach(function(b){ b.rgb = hex(b.c); }); }
+  });
+
+  var cur = 0;                                  // which content
+  var pixelsOnly = false;                       // what the screen shows
+
+  function ramp(P, s){                          // clamped, end to end
+    var n = P.rgb.length - 1;
+    var x = Math.max(0, Math.min(1, s)) * n;
+    var i = Math.min(n-1, Math.floor(x));
+    return lerp3(P.rgb[i], P.rgb[i+1], x - i);
+  }
+  function cyc(P, s){                           // wraps round for a travelling cycle
+    var n = P.rgb.length;
+    var x = ((s % 1) + 1) % 1 * n;
+    var i = Math.floor(x);
+    return lerp3(P.rgb[i % n], P.rgb[(i+1) % n], x - i);
+  }
+  function drift(P, t){ return P.off + P.amp * Math.sin(TAU * P.freq * t); }
+
+  // the falloff of one cloud, matching the radial gradient stops below
+  var PROF_O = [0, 0.22, 0.45, 0.70, 1];
+  var PROF_A = [1, 0.80, 0.50, 0.18, 0];
+  function profile(d){
+    if(d >= 1){ return 0; }
+    for(var i=1;i<PROF_O.length;i++){
+      if(d <= PROF_O[i]){
+        var f = (d - PROF_O[i-1]) / (PROF_O[i] - PROF_O[i-1]);
+        return PROF_A[i-1] + (PROF_A[i] - PROF_A[i-1]) * f;
+      }
+    }
+    return 0;
+  }
+  function blobAt(b, t){
+    return {
+      x: SX + (b.x + b.ax*Math.sin(TAU*b.fx*t + b.px)) * SW,
+      y: SY + (b.y + b.ay*Math.sin(TAU*b.fy*t + b.py)) * SH,
+      r: b.r + b.rA*Math.sin(TAU*b.fx*0.7*t + b.py)
+    };
+  }
+
+  // the colour at a point of the screen, in normalised 0..1 screen space
+  function field(P, a, b, t){
+    if(P.kind === "ramp"){
+      return ramp(P, (P.dir[0]*a + P.dir[1]*b) * P.span + drift(P, t));
+    }
+    if(P.kind === "flow"){
+      var th = P.angle0 + P.rot * t * TAU;
+      var cx = Math.cos(th), cy = Math.sin(th);
+      var L = (Math.abs(cx) + Math.abs(cy)) / 2;
+      var u = (a*cx + b*cy - 0.5*(cx+cy) + L) / (2*L);
+      return cyc(P, u * P.repeats + t * P.speed);
+    }
+    // clouds: the same stack the screen paints, in the same order
+    var px = SX + a*SW, py = SY + b*SH;
+    var c = P.baseRgb;
+    for(var i=0;i<P.blobs.length;i++){
+      var bl = P.blobs[i], g = blobAt(bl, t);
+      var d = Math.sqrt((px-g.x)*(px-g.x) + (py-g.y)*(py-g.y)) / g.r;
+      var al = profile(d) * bl.a;
+      if(al > 0){ c = lerp3(c, bl.rgb, al); }
+    }
+    return c;
+  }
+
+  // ---------- the fixtures, described once in unit space ----------
+  var LIN = [
+    {u:0.10, v0:0.18, v1:0.72, n:6},
+    {u:0.33, v0:0.06, v1:0.60, n:6},
+    {u:0.56, v0:0.22, v1:0.76, n:6},
+    {u:0.79, v0:0.10, v1:0.64, n:6}
+  ];
+  var DOTS = [0.06, 0.27, 0.48, 0.69, 0.90].map(function(u){ return {u:u, v:0.94}; });
+
+  var pts = [];
+  LIN.forEach(function(L){
+    for(var i=0;i<L.n;i++){ pts.push({u:L.u, v:L.v0 + (L.v1-L.v0)*(i/(L.n-1))}); }
+  });
+  DOTS.forEach(function(d){ pts.push({u:d.u, v:d.v}); });
+
+  function rx(u){ return RX + u*RW; }
+  function ry(v){ return RY + v*RH; }
+  function sx(u){ return SX + PAD + u*(SW - 2*PAD); }
+  function sy(v){ return SY + PAD + v*(SH - 2*PAD); }
+
+  var defs = el("defs", {});
+  defs.innerHTML =
+    '<filter id="soft" x="-200%" y="-200%" width="500%" height="500%">' +
+      '<feGaussianBlur stdDeviation="7"/></filter>' +
+    '<filter id="haze" x="-200%" y="-200%" width="500%" height="500%">' +
+      '<feGaussianBlur stdDeviation="20"/></filter>' +
+    '<filter id="dot" x="-300%" y="-300%" width="700%" height="700%">' +
+      '<feGaussianBlur stdDeviation="6"/></filter>';
+
+  // ================= the screen =================
+  el("rect", {x:SX-16, y:SY-16, width:SW+32, height:SH+32, "class":"case"});
+  el("rect", {x:SX+SW/2-34, y:SY+SH+16, width:68, height:34, "class":"case"});
+  el("rect", {x:SX+SW/2-96, y:SY+SH+50, width:192, height:14, "class":"case"});
+  el("rect", {x:SX, y:SY, width:SW, height:SH, "class":"inset"});
+
+  // gradient contents, drawn as a real gradient so they stay perfectly smooth
+  var NSTOP = 65;
+  var grad = el("linearGradient", {id:"content", x1:0, y1:0, x2:0, y2:1}, defs);
+  var stopEls = [];
+  for(var s=0;s<NSTOP;s++){
+    stopEls.push(el("stop", {offset:(s/(NSTOP-1)), "stop-color":"#ffffff"}, grad));
+  }
+  var contentRect = el("rect", {x:SX, y:SY, width:SW, height:SH, fill:"url(#content)"});
+
+  // cloud contents, one soft radial per cloud
+  var CLOUD = PRESETS[2];
+  var cloudG = el("g", {});
+  el("rect", {x:SX, y:SY, width:SW, height:SH, fill:CLOUD.base}, cloudG);
+  var cloudGrads = [];
+  CLOUD.blobs.forEach(function(b, i){
+    var g = el("radialGradient", {id:"cloud"+i, gradientUnits:"userSpaceOnUse",
+      cx:0, cy:0, r:b.r}, defs);
+    for(var k=0;k<PROF_O.length;k++){
+      el("stop", {offset:PROF_O[k], "stop-color":b.c, "stop-opacity":(PROF_A[k]*b.a)}, g);
+    }
+    el("rect", {x:SX, y:SY, width:SW, height:SH, fill:"url(#cloud"+i+")"}, cloudG);
+    cloudGrads.push(g);
+  });
+
+  // every mapped pixel, twice: an outline over the content, a lit dot on its own
+  var markG = el("g", {});
+  var dotHazeG = el("g", {filter:"url(#dot)", opacity:".9"});
+  var dotG = el("g", {});
+  var outlines = [], dotHaze = [], dots = [];
+  pts.forEach(function(p){
+    var x = sx(p.u), y = sy(p.v);
+    outlines.push(el("rect", {x:x-7, y:y-7, width:14, height:14, fill:"none",
+      stroke:"#171717", "stroke-width":1.6, opacity:".6"}, markG));
+    dotHaze.push(el("rect", {x:x-9, y:y-9, width:18, height:18}, dotHazeG));
+    dots.push(el("rect", {x:x-5, y:y-5, width:10, height:10, rx:2}, dotG));
+  });
+
+  txt(SX-16, 590, "MAPPING SOFTWARE", "name");
+  txt(SX-16, SY-46, "X / Y COORDINATES", "tag");
+
+  // ================= real world =================
+  var hazeG = el("g", {filter:"url(#haze)", opacity:".45"});
+  var bloomG = el("g", {filter:"url(#soft)", opacity:".85"});
+  var realHaze = [], realBloom = [], realBody = [];
+
+  LIN.forEach(function(L){
+    var x = rx(L.u), y0 = ry(L.v0), y1 = ry(L.v1);
+    el("rect", {x:x-15, y:y0-18, width:30, height:(y1-y0)+36, "class":"case"});
+  });
+  DOTS.forEach(function(d){
+    el("circle", {cx:rx(d.u), cy:ry(d.v), r:17, "class":"case"});
+  });
+
+  pts.forEach(function(p, i){
+    var isDot = i >= LIN.length*6;
+    var x = rx(p.u), y = ry(p.v);
+    realHaze.push(isDot
+      ? el("circle", {cx:x, cy:y, r:16}, hazeG)
+      : el("rect", {x:x-12, y:y-12, width:24, height:24}, hazeG));
+    realBloom.push(isDot
+      ? el("circle", {cx:x, cy:y, r:13}, bloomG)
+      : el("rect", {x:x-11, y:y-11, width:22, height:22, rx:3}, bloomG));
+    realBody.push(isDot
+      ? el("circle", {cx:x, cy:y, r:10})
+      : el("rect", {x:x-8, y:y-8, width:16, height:16, rx:2}));
+  });
+
+  txt(RX, 590, "REAL WORLD", "name");
+  txt(RX, RY-46, "PIXELS AND LINEARS", "tag");
+
+  // ================= between the two =================
+  var GA = 600, GB = 742, MID = (GA+GB)/2;
+
+  el("path", {"class":"hair", d:"M " + GB + ",290 L " + GA + ",290"});
+  el("path", {"class":"hair", d:"M " + (GA+11) + ",284 L " + GA + ",290 L " + (GA+11) + ",296"});
+  txt(MID, 269, "MAP", "tag", "middle");
+
+  el("path", {"class":"blue", d:"M " + GA + ",440 L " + GB + ",440"});
+  el("path", {"class":"blue", d:"M " + (GB-11) + ",434 L " + GB + ",440 L " + (GB-11) + ",446"});
+  txt(MID, 469, "ART-NET / sACN", "tagb", "middle");
+
+  var pkts = [];
+  for(var q=0;q<2;q++){
+    var g = el("g", {});
+    el("rect", {x:-9, y:-9, width:18, height:18, fill:NET, filter:"url(#soft)", opacity:.45}, g);
+    el("rect", {x:-6, y:-6, width:12, height:12, fill:NET}, g);
+    pkts.push(g);
+  }
+
+  // ================= the controls =================
+  var SCREEN_MID = SX + SW/2;
+
+  function row(labels, y, onPick){
+    var items = [], total = 0, GAPX = 40;
+    labels.forEach(function(s){
+      var g = el("g", {});
+      var label = txt(0, y, s, "pick", "middle", g);
+      var rule = el("line", {x1:0, y1:y+11, x2:0, y2:y+11, stroke:"#000000", "stroke-width":1.5}, g);
+      var hit  = el("rect", {y:y-19, height:32, "class":"hit"}, g);
+      items.push({label:label, rule:rule, hit:hit, w:0});
+    });
+    items.forEach(function(it, i){
+      it.w = it.label.getComputedTextLength();
+      total += it.w + (i ? GAPX : 0);
+    });
+    var x = SCREEN_MID - total/2;
+    items.forEach(function(it, i){
+      var m = x + it.w/2;
+      it.label.setAttribute("x", m);
+      it.rule.setAttribute("x1", m - it.w/2);
+      it.rule.setAttribute("x2", m + it.w/2);
+      it.hit.setAttribute("x", m - it.w/2 - 14);
+      it.hit.setAttribute("width", it.w + 28);
+      it.hit.addEventListener("click", function(){ onPick(i); });
+      x += it.w + GAPX;
+    });
+    return items;
+  }
+
+  var contentRow = row(PRESETS.map(function(P){ return P.label; }), 634,
+    function(i){ cur = i; drawControls(); });
+  var viewRow = row(["FULL CONTENT", "PIXELS ONLY"], 676,
+    function(i){ pixelsOnly = (i === 1); drawControls(); });
+
+  function mark(items, active){
+    items.forEach(function(it, i){
+      it.label.setAttribute("opacity", i === active ? "1" : ".35");
+      it.rule.setAttribute("opacity", i === active ? "1" : "0");
+    });
+  }
+  function drawControls(){
+    mark(contentRow, cur);
+    mark(viewRow, pixelsOnly ? 1 : 0);
+    var isCloud = PRESETS[cur].kind === "cloud";
+    contentRect.setAttribute("opacity", (!pixelsOnly && !isCloud) ? "1" : "0");
+    cloudG.setAttribute("opacity", (!pixelsOnly && isCloud) ? "1" : "0");
+    markG.setAttribute("opacity", pixelsOnly ? "0" : "1");
+    dotG.setAttribute("opacity", pixelsOnly ? "1" : "0");
+    dotHazeG.setAttribute("opacity", pixelsOnly ? ".9" : "0");
+  }
+  drawControls();
+
+  // ================= animation =================
+  var LAG = 0.9, PKT_HZ = 0.5;
+
+  function fade(u){ return Math.min(1, u/0.12) * Math.min(1, (1-u)/0.12); }
+
+  function paint(t){
+    var P = PRESETS[cur];
+
+    if(!pixelsOnly){
+      if(P.kind === "ramp"){
+        grad.setAttribute("x1", 0); grad.setAttribute("y1", 0);
+        grad.setAttribute("x2", P.dir[0]); grad.setAttribute("y2", P.dir[1]);
+        var d = drift(P, t);
+        for(var s=0;s<NSTOP;s++){
+          stopEls[s].setAttribute("stop-color", css(ramp(P, (s/(NSTOP-1))*P.span + d)));
+        }
+      } else if(P.kind === "flow"){
+        var th = P.angle0 + P.rot * t * TAU;
+        var cx = Math.cos(th), cy = Math.sin(th);
+        var L = (Math.abs(cx) + Math.abs(cy)) / 2;
+        grad.setAttribute("x1", 0.5 - cx*L); grad.setAttribute("y1", 0.5 - cy*L);
+        grad.setAttribute("x2", 0.5 + cx*L); grad.setAttribute("y2", 0.5 + cy*L);
+        for(var k=0;k<NSTOP;k++){
+          stopEls[k].setAttribute("stop-color", css(cyc(P, (k/(NSTOP-1))*P.repeats + t*P.speed)));
+        }
+      } else {
+        for(var c=0;c<P.blobs.length;c++){
+          var g = blobAt(P.blobs[c], t);
+          cloudGrads[c].setAttribute("cx", g.x);
+          cloudGrads[c].setAttribute("cy", g.y);
+          cloudGrads[c].setAttribute("r",  g.r);
+        }
+      }
+    }
+
+    for(var p=0;p<pts.length;p++){
+      var a = (sx(pts[p].u) - SX)/SW, b = (sy(pts[p].v) - SY)/SH;
+      if(pixelsOnly){
+        var live = css(field(P, a, b, t));
+        dots[p].setAttribute("fill", live);
+        dotHaze[p].setAttribute("fill", live);
+      }
+      // the fixture shows whatever sat at its coordinate a moment ago
+      var col = css(field(P, a, b, t - LAG));
+      realBody[p].setAttribute("fill", col);
+      realBloom[p].setAttribute("fill", col);
+      realHaze[p].setAttribute("fill", col);
+    }
+
+    for(var j=0;j<pkts.length;j++){
+      var u = ((t*PKT_HZ + j/pkts.length) % 1 + 1) % 1;
+      pkts[j].setAttribute("transform", "translate(" + (GA + u*(GB-GA)) + ",440)");
+      pkts[j].setAttribute("opacity", fade(u));
+    }
+  }
+
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce){
+    paint(2);
+  } else {
+    var t0 = null;
+    function frame(ts){
+      if(t0 === null){ t0 = ts; }
+      paint((ts - t0)/1000);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- fit the canvas to the frame ----------
+  var fitEl = document.getElementById("fit");
+  function fit(){
+    var k = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    fitEl.style.transform = "translate(-50%,-50%) scale(" + k + ")";
+  }
+  fit();
+  window.addEventListener("resize", fit);
+})();
+</script>
+</body>
+</html>
