@@ -23,8 +23,8 @@
 </head>
 <body>
 <div class="stage">
-  <svg id="scene" viewBox="0 0 1600 470" role="img"
-       aria-label="Three single pixel modules above a linear fixture whose many pixels resolve the same travelling pattern">
+  <svg id="scene" viewBox="0 0 1600 690" role="img"
+       aria-label="Three single pixel modules, a linear fixture with a pixel per lens, and a linear G54 whose lenses light in four groups">
     <defs>
       <filter id="bloom" x="-140%" y="-140%" width="380%" height="380%">
         <feGaussianBlur stdDeviation="8"/>
@@ -64,17 +64,9 @@
     for(var k in a){ n.setAttribute(k, a[k]); }
     return n;
   }
-  function hue2rgb(h){
-    h = ((h % 360) + 360) % 360;
-    var x = 1-Math.abs((h/60)%2-1), r,g,b;
-    if(h<60){r=1;g=x;b=0;} else if(h<120){r=x;g=1;b=0;} else if(h<180){r=0;g=1;b=x;}
-    else if(h<240){r=0;g=x;b=1;} else if(h<300){r=x;g=0;b=1;} else {r=1;g=0;b=x;}
-    return "rgb(" + Math.round(r*255) + "," + Math.round(g*255) + "," + Math.round(b*255) + ")";
-  }
 
   // one wave crossing the whole canvas, so both rows read the same moment in the same effect
   var CYCLES = 1.5, SPEED = 40;
-  function hueAt(x, phase){ return (x / W) * CYCLES * 360 + phase; }
 
   // tunable white, swept in mired so the steps read evenly across the range
   var K_WARM = 2200, K_COOL = 7500;
@@ -173,11 +165,48 @@
     world.appendChild(ld); barLeds.push(ld);
   }
 
+  // ================= row 3 =================
+  // a linear G54: round lenses, driven in four groups rather than one by one
+  var CY3 = 560, R_G = 18;
+  var GROUPS = 4, PER = NLED / GROUPS;
+
+  var hazeGrp3 = el("g", {filter:"url(#haze)", opacity:"0.42"});
+  var hazes3 = [];
+  for(var h3=0;h3<NLED;h3++){
+    var hz3 = el("circle", {cx:lx[h3], cy:CY3, r:WIN*0.62});
+    hazeGrp3.appendChild(hz3); hazes3.push(hz3);
+  }
+  world.appendChild(hazeGrp3);
+
+  world.appendChild(el("rect", {x:BAR_X, y:CY3-BAR_H/2, width:BAR_W, height:BAR_H, fill:"#171717"}));
+
+  var gBloomGrp = el("g", {filter:"url(#bloomS)", opacity:"0.85"});
+  var gBlooms = [], gLeds = [];
+  for(var b3=0;b3<NLED;b3++){
+    var bb3 = el("circle", {cx:lx[b3], cy:CY3, r:R_G*1.35});
+    gBloomGrp.appendChild(bb3); gBlooms.push(bb3);
+  }
+  world.appendChild(gBloomGrp);
+  for(var l3=0;l3<NLED;l3++){
+    var ld3 = el("circle", {cx:lx[l3], cy:CY3, r:R_G});
+    world.appendChild(ld3); gLeds.push(ld3);
+    world.appendChild(el("circle", {cx:lx[l3], cy:CY3, r:R_G+3.5,
+      fill:"none", stroke:"rgba(255,255,255,.10)", "stroke-width":1.5}));
+  }
+
+  // where each group sits, so its colour is sampled from the same wave
+  var gx = [];
+  for(var q=0;q<GROUPS;q++){
+    var sum = 0;
+    for(var k2=0;k2<PER;k2++){ sum += lx[q*PER + k2]; }
+    gx.push(sum / PER);
+  }
+
   // ================= paint =================
   function paint(phase){
     for(var i=0;i<mods.length;i++){
       var m = mods[i];
-      var col = hue2rgb(hueAt(m.cx, phase));
+      var col = kelvin2rgb(cctAt(m.cx, phase));
       for(var j=0;j<m.chips.length;j++){
         m.chips[j].setAttribute("fill", col);
         m.blooms[j].setAttribute("fill", col);
@@ -189,6 +218,15 @@
       barLeds[n].setAttribute("fill", c);
       barBlooms[n].setAttribute("fill", c);
       hazes[n].setAttribute("fill", c);
+    }
+    for(var q2=0;q2<GROUPS;q2++){
+      var gc = kelvin2rgb(cctAt(gx[q2], phase));
+      for(var k3=0;k3<PER;k3++){
+        var idx = q2*PER + k3;
+        gLeds[idx].setAttribute("fill", gc);
+        gBlooms[idx].setAttribute("fill", gc);
+        hazes3[idx].setAttribute("fill", gc);
+      }
     }
   }
 
