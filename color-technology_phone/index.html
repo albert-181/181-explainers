@@ -7,12 +7,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f%5B%5D=general-sans@400,500&display=swap" rel="stylesheet">
 <style>
   :root{
     --black:#000000;
     --white:#ffffff;
     --display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
-    --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    --body:"General Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:transparent}
@@ -47,7 +48,7 @@
   }
   .panel:hover{opacity:.72}
   .panel.on{opacity:1;cursor:default;background:rgba(0,0,0,.045)}
-  .panel .head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .panel .head{display:flex;align-items:baseline;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
   .panel .name{
     font-family:var(--display);font-weight:500;
     font-size:clamp(17px,1.8vw,24px);line-height:1.05;letter-spacing:-.02em;
@@ -57,6 +58,9 @@
   }
   .panel .spec{font-size:11px;line-height:1.5;margin-top:4px;opacity:.8}
   .panel .note{font-size:10px;line-height:1.4;margin-top:8px;opacity:.7}
+
+  .kelvin{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap}
+  .ktag{font-size:9px;letter-spacing:.14em;text-transform:uppercase;opacity:.6}
 
   .seg.mini{border-width:1.5px;flex:0 0 auto}
   .seg.mini button{font-size:9px;letter-spacing:.14em;padding:5px 8px}
@@ -156,13 +160,17 @@
   var K2700 = [255,169, 87];
   var K3000 = [255,180,107];
   var K4000 = [255,209,163];
+  var K5000 = [255,228,206];
   var K6500 = [255,249,253];
+  // the three channel strip reads better with the ladder pushed apart a little
+  var TW3_N = [255,228,200];
+  var TW3_C = [222,236,255];
 
   var TECH = {
     sw: {
-      name:"Static white", count:"1 CH",
-      spec:"Fixed 3000K. One channel, so the only thing you can change is how bright it is.",
-      chans:[{id:"d", lab:"Dim", col:K3000, init:100}]
+      name:"Single white", count:"1 CH", kelvin:true, kIdx:0,
+      spec:"One white chip on one channel, so the only thing you can change is how bright it is. The chip comes in several color temperatures.",
+      chans:[{id:"d", lab:"Dim", col:K3000.slice(), init:100}]
     },
     tw2: {
       name:"Tunable white", count:"2 CH", tw:true,
@@ -174,8 +182,8 @@
       name:"Tunable white", count:"3 CH", tw:true, note:true,
       spec:"Warm, neutral and cool on one three channel IC. The same white range, with the middle of the curve under its own control.",
       chans:[{id:"ww", lab:"Warm",    col:K2700, k:2700, init:70},
-             {id:"nw", lab:"Neutral", col:K4000, k:4000, init:55},
-             {id:"cw", lab:"Cool",    col:K6500, k:6500, init:20}]
+             {id:"nw", lab:"Neutral", col:TW3_N, k:4000, init:55},
+             {id:"cw", lab:"Cool",    col:TW3_C, k:6500, init:20}]
     },
     rgb: {
       name:"RGB", count:"3 CH",
@@ -185,12 +193,12 @@
              {id:"b", lab:"Blue",  col:[0,0,255], init:0}]
     },
     rgbw: {
-      name:"RGBW", count:"4 CH",
-      spec:"Color plus a dedicated 4000K white chip, so white is a real white instead of a mix.",
+      name:"RGBW", count:"4 CH", kelvin:true, kIdx:3,
+      spec:"Color plus a dedicated white chip, so white is a real white instead of a mix. The chip comes in several color temperatures.",
       chans:[{id:"r", lab:"Red",   col:[255,0,0], init:0},
              {id:"g", lab:"Green", col:[0,255,0], init:0},
              {id:"b", lab:"Blue",  col:[0,0,255], init:25},
-             {id:"w", lab:"White", col:K4000,     init:85}]
+             {id:"w", lab:"White", col:K4000.slice(), init:85}]
     },
     rgbtw: {
       name:"RGB + TW", count:"5 CH", note:true,
@@ -206,9 +214,12 @@
   var PANELS = ["sw","tw","rgb","rgbw","rgbtw"];      // one panel per column entry
   var KEYS   = ["sw","tw2","tw3","rgb","rgbw","rgbtw"];
   var NOTE   = "*Only available for DiGi LED Strips";
+  var KELVINS = [2700, 3000, 4000, 5000];
+  var KTAB = {2700:K2700, 3000:K3000, 4000:K4000, 5000:K5000};
 
   var active = "rgbtw";      // which panel is on
   var twCh = 2;              // the tunable white panel shows 2 or 3 channels
+  var kSel = {sw:3000, rgbw:4000};   // which white chip each of these two carries
   var diffused = true;
   var level = {};
 
@@ -277,7 +288,19 @@
         '</span>'
       : '<span class="count">' + d.count + '</span>';
 
+    var kel = "";
+    if(d.kelvin){
+      kel = '<div class="kelvin"><span class="ktag">White</span>' +
+              '<span class="seg mini" role="group" aria-label="White color temperature">' +
+              KELVINS.map(function(k){
+                return '<button type="button" data-k="' + k + '"' +
+                       (k === kSel[t] ? ' class="on"' : '') + '>' + k + 'K</button>';
+              }).join('') +
+            '</span></div>';
+    }
+
     var html = '<div class="head"><span class="name">' + d.name + '</span>' + right + '</div>' +
+               kel +
                '<div class="ch-row">';
     d.chans.forEach(function(c){
       var v = level[t][c.id];
@@ -298,6 +321,19 @@
         setActive(panel);
         level[keyOf(panel)][s.dataset.chan] = +s.value;
         document.getElementById("v-" + panel + "-" + s.dataset.chan).textContent = s.value + "%";
+        render();
+      });
+    });
+    Array.prototype.forEach.call(p.querySelectorAll("button[data-k]"), function(b){
+      b.addEventListener("click", function(){
+        setActive(panel);
+        var kt = keyOf(panel);
+        var k = +b.dataset.k;
+        if(k === kSel[kt]){ return; }
+        kSel[kt] = k;
+        TECH[kt].chans[TECH[kt].kIdx].col = KTAB[k].slice();
+        buildPanel(panel);
+        buildModule();
         render();
       });
     });
@@ -411,7 +447,7 @@
   }
 
   function subLine(t){
-    if(t === "sw"){ return "3000K · " + level.sw.d + "% output"; }
+    if(t === "sw"){ return kSel.sw + "K · " + level.sw.d + "% output"; }
     if(TECH[t].tw){
       // white sources blend close to linearly in mired, not in kelvin
       var sum = 0, mired = 0;
