@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controllers and outputs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --black:#000000;
+    --blue:#000080;
+    --display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
+    --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:transparent;height:100%;overflow:hidden}
+
+  /* drawn once at 1280 x 720, then scaled to fit the frame it sits in */
+  #fit{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:50% 50%}
+  svg{display:block;width:1280px;height:720px}
+
+  .name{font-family:var(--display);font-weight:500;font-size:20px;letter-spacing:.12em;fill:var(--black)}
+  .tag{font-family:var(--body);font-size:12px;letter-spacing:.26em;fill:var(--black);opacity:.55}
+  .tagb{font-family:var(--body);font-size:12px;letter-spacing:.26em;fill:var(--blue)}
+  .over{font-family:var(--body);font-size:12px;letter-spacing:.26em;fill:var(--black);opacity:.3}
+
+  .build{position:absolute;right:30px;top:698px;font-family:var(--body);font-size:10px;
+    letter-spacing:.14em;opacity:.34;font-variant-numeric:tabular-nums}
+  .ctl{
+    position:absolute;left:0;width:1280px;
+    display:flex;justify-content:center;flex-wrap:wrap;gap:10px 30px;align-items:center;
+  }
+  #ctlDev{top:598px}
+  #ctlMode{top:640px}
+  #ctlPx{top:678px}
+  .ctl button{
+    font-family:var(--body);font-size:13px;letter-spacing:.22em;color:var(--black);
+    background:transparent;border:0;border-bottom:1.5px solid transparent;
+    padding:0 0 4px;line-height:1.1;cursor:pointer;opacity:.35;white-space:nowrap;
+  }
+  .ctl button.on{opacity:1;border-bottom-color:var(--black)}
+  .ctl span{font-family:var(--body);font-size:12px;letter-spacing:.26em;opacity:.55}
+  .ctl b{font-family:var(--body);font-size:12px;letter-spacing:.18em;font-weight:400;
+    min-width:74px;text-align:left}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:300px;height:1.5px;background:rgba(0,0,0,.25);
+    outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
+    border-radius:50%;background:var(--blue);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:11px;height:11px;border:0;border-radius:50%;
+    background:var(--blue);cursor:pointer}
+</style>
+</head>
+<body>
+<div id="fit">
+  <svg id="scene" viewBox="0 0 1280 720" role="img"
+       aria-label="A DiGidot controller with its data cables leaving in parallel. Choosing a protocol changes how many conductors each output needs: SPI and DMX TTL take one, balanced DMX512 and PxLNet take a pair."></svg>
+  <div class="ctl" id="ctlDev"></div>
+  <div class="ctl" id="ctlMode"></div>
+  <div class="build">v1.2 &middot; 24 Sep 2026 18:20</div>
+  <div class="ctl" id="ctlPx">
+    <span>PIXELS PER OUTPUT</span>
+    <input type="range" id="px" min="16" max="700" value="140">
+    <b id="pxv">140</b>
+  </div>
+</div>
+
+<script>
+(function(){
+  var NS="http://www.w3.org/2000/svg";
+  var svg=document.getElementById("scene");
+
+  function el(t,a,p){ var n=document.createElementNS(NS,t);
+    for(var k in a) n.setAttribute(k,a[k]); (p||svg).appendChild(n); return n; }
+  function txt(x,y,s,c,an,p){ var n=el("text",{x:x,y:y,"class":c},p);
+    if(an) n.setAttribute("text-anchor",an); n.textContent=s; return n; }
+
+  /* ---- the DiGidot mark: colour fixed to the row, pale cyan at the top down to
+          deep blue, brightness travelling down the shape. ---- */
+  var D_MASK=[[1,1,1,0],[1,0,0,1],[1,1,1,1],[1,1,1,1],[1,1,1,0]], D_SEQ=[];
+  (function(){ for(var r=0;r<5;r++) for(var c=0;c<4;c++) if(D_MASK[r][c]) D_SEQ.push([c,r]); })();
+  var D_RAMP=[[0,[0,24,52]],[0.30,[0,89,150]],[0.55,[0,143,212]],[0.80,[110,214,240]],[1,[200,242,252]]];
+  function dRamp(k){
+    k=k<0?0:k>1?1:k;
+    for(var i=1;i<D_RAMP.length;i++){
+      if(k<=D_RAMP[i][0]){
+        var a=D_RAMP[i-1],b=D_RAMP[i],f=(k-a[0])/(b[0]-a[0]);
+        return "rgb("+Math.round(a[1][0]+(b[1][0]-a[1][0])*f)+","+
+                      Math.round(a[1][1]+(b[1][1]-a[1][1])*f)+","+
+                      Math.round(a[1][2]+(b[1][2]-a[1][2])*f)+")";
+      }
+    }
+    return "rgb(200,242,252)";
+  }
+  function dColor(v){ return dRamp(1-v*0.85); }
+  function dBright(v,t){ return 0.18+0.82*(0.5+0.5*Math.sin(6.2832*(v*0.72-t*0.24)-1.5708)); }
+
+  /* ---- the controllers ----
+     The physical conductors are fixed by the connector and never move when the
+     protocol changes. What changes is how the data rides on them: `groups`
+     lists which contacts carry data, and which travel together as a pair.
+     Contacts are numbered from the bottom of the terminal block, 1 upward.   */
+  var DEV={
+    c1:{ name:"DIGIDOT C1", w:264, h:126, form:"box",
+      block:{pins:4, pitch:16, data:[3,4]},
+      modes:{
+        spi:{t:"SPI",    groups:[[3]],   outs:1, tag:"1 OUTPUT  ·  SPI DATA"},
+        dmx:{t:"DMX",    groups:[[4,3]], outs:1, dmx:true, tag:"1 OUTPUT  ·  DMX, ONE BALANCED PAIR"},
+        pxl:{t:"PXLNET", groups:[[4,3]], outs:1, tag:"1 OUTPUT  ·  PXLNET, ONE PAIR"}
+      },
+      order:["spi","dmx","pxl"], maxUni:4,
+      lic:function(u){ return u<=1?"EXTENDED 1":u<=4?"LIVE 4":null; } },
+
+    c4:{ name:"DIGIDOT C4", w:424, h:204, form:"box",
+      block:{pins:6, pitch:20, data:[3,4,5,6]},
+      modes:{
+        spi:{t:"SPI",    groups:[[6],[5],[4],[3]], outs:4, tag:"4 OUTPUTS  ·  SPI DATA"},
+        dmx:{t:"DMX512", groups:[[6,5],[4,3]],     outs:2, dmx:true, tag:"2 OUTPUTS  ·  DMX512, TWO BALANCED PAIRS"},
+        pxl:{t:"PXLNET", groups:[[6,5],[4,3]],     outs:2, tag:"2 OUTPUTS  ·  PXLNET, TWO PAIRS"},
+        tx: {t:"+ PXLNET TRANSMITTER", rj:4, rjScale:1.7, outs:4, txKit:true,
+             tag:"4 OUTPUTS  ·  PXLNET ON RJ45, ONE PAIR EACH"}
+      },
+      order:["spi","dmx","pxl","tx"], maxUni:24,
+      lic:function(u){ return u<=12 ? "EXTENDED "+(u<=2?2:u<=4?4:u<=8?8:12)
+                            : u<=24 ? "LIVE "+(u<=8?8:u<=12?12:u<=16?16:24) : null; } },
+
+    /* Portrait, as in the DiGidot drawing: the front face runs vertically and
+       the depth horizontally. The U12X face is 212 mm, the U24X 440.5 mm, both
+       298 mm deep, so the U12X is drawn half the height of the U24X. */
+    pn:{ name:"POWER NODE U12X", w:243, h:176, form:"rack", step:true,
+      blocks:{count:4, pins:3, pitch:10, data:2},
+      modes:{ spi:{t:"SPI", outs:4, tag:"4 OUTPUTS  ·  SPI DATA"} },
+      order:["spi"], maxUni:12,
+      lic:function(u){ return u<=12 ? "EXTENDED 12  ·  FIXED" : null; } },
+
+    pn24:{ name:"POWER NODE U24X", w:243, h:360, form:"rack", step:true,
+      blocks:{count:8, pins:3, pitch:10, data:2},
+      modes:{ spi:{t:"SPI", outs:8, tag:"8 OUTPUTS  ·  SPI DATA"} },
+      order:["spi"], maxUni:24,
+      lic:function(u){ return u<=24 ? "EXTENDED 24  ·  FIXED" : null; } },
+
+    nod:{ name:"PXLNET NODE", w:272, h:360, form:"rack",
+      modes:{ pxl:{t:"PXLNET", rj:16, rjScale:1.15, outs:16,
+                   tag:"16 OUTPUTS  ·  PXLNET ON RJ45, ONE PAIR EACH"} },
+      order:["pxl"], maxUni:96,
+      lic:function(u){ return u<=48?"U48  ·  LIVE":u<=96?"U96  ·  LIVE":null; } }
+  };
+  var ORDER=["c1","c4","pn","pn24","nod"];
+  var cur="c4", mode="spi", px=140;
+
+  var DX=118, CY=346, ENDX=1180;
+  var NET="#000080", BK="#131313";
+  var DASH=248;              // one packet every DASH units along a line
+
+  var defs=el("defs",{});
+  defs.innerHTML=
+    '<linearGradient id="case" x1="0" y1="0" x2="0.7" y2="1">'+
+      '<stop offset="0" stop-color="#3a3a3a"/><stop offset="0.45" stop-color="#242424"/>'+
+      '<stop offset="1" stop-color="#121212"/></linearGradient>'+
+    '<filter id="glow" x="-300%" y="-300%" width="700%" height="700%">'+
+      '<feGaussianBlur stdDeviation="4"/></filter>';
+
+  var gWire=el("g",{});
+  var gFlow=el("g",{});
+  var gBody=el("g",{});
+  var gText=el("g",{});
+
+  var nameT=txt(DX,104,"","name",null,gText);
+  var tagT =txt(DX,130,"","tag",null,gText);
+  var licT =txt(DX,566,"","tagb",null,gText);
+  var uniT =txt(ENDX,566,"","tag","end",gText);
+
+  var marks=[], flows=[];
+  function clear(g){ while(g.firstChild) g.removeChild(g.firstChild); }
+
+  /* ---- connectors ---- */
+  // Pluggable screw terminal. Returns contact y by number from the bottom.
+  function block(x,cy,pins,pitch){
+    var h=pins*pitch+4, w=Math.round(pitch*1.35), y=cy-h/2, at={};
+    el("rect",{x:x,y:y,width:w,height:h,rx:2,fill:"#0d0d0d"},gBody);
+    el("rect",{x:x,y:y,width:w,height:h,rx:2,fill:"none",
+      stroke:"#ffffff","stroke-width":1,opacity:".2"},gBody);
+    for(var i=0;i<pins;i++){
+      var py=y+2+pitch*(i+0.5);
+      el("rect",{x:x+w*0.22,y:py-pitch*0.30,width:w*0.56,height:pitch*0.60,rx:0.8,fill:"#000000"},gBody);
+      el("circle",{cx:x+w*0.5,cy:py,r:pitch*0.16,fill:"none",
+        stroke:"#ffffff","stroke-width":0.9,opacity:".30"},gBody);
+      at[pins-i]=py;                       // top contact is the highest number
+    }
+    return {w:w, at:at};
+  }
+  // An integrated RJ45.
+  function rj45(x,cy,s){
+    var w=19*s,h=15*s;
+    el("rect",{x:x,y:cy-h/2,width:w,height:h,rx:1.2,fill:"#e9e9e2"},gBody);
+    el("rect",{x:x+w*0.34,y:cy-h/2,width:w*0.32,height:h*0.34,fill:"#1b1b1b",opacity:".8"},gBody);
+    el("rect",{x:x,y:cy+h*0.26,width:w,height:h*0.24,fill:"#000000",opacity:".26"},gBody);
+    return w;
+  }
+
+  /* ---- bodies ---- */
+  function drawBody(bx,by,D){
+    if(D.form==="rack"){
+      el("rect",{x:bx,y:by,width:D.w,height:D.h,rx:3,fill:BK},gBody);
+      if(D.step) el("rect",{x:bx+D.w-22,y:by-12,width:22,height:D.h+24,rx:2,fill:BK},gBody);
+      [[0.08,0.03],[0.92,0.03],[0.08,0.97],[0.92,0.97]].forEach(function(p){
+        el("circle",{cx:bx+D.w*p[0],cy:by+D.h*p[1],r:3.5,fill:"none",
+          stroke:"#ffffff","stroke-width":1,opacity:".26"},gBody);
+      });
+      if(!D.led) return;
+      marks.push({
+        g:el("circle",{cx:bx+D.w*0.5,cy:by+D.h*0.62,r:18,fill:dColor(0.35),filter:"url(#glow)"},gBody),
+        f:el("circle",{cx:bx+D.w*0.5,cy:by+D.h*0.62,r:6,fill:dColor(0.35)},gBody), v:0.35 });
+      return;
+    }
+    // moulded boxes, C1 and C4
+    el("rect",{x:bx,y:by,width:D.w,height:D.h,rx:D.h*0.075,fill:"url(#case)"},gBody);
+    // the recessed panel, lower right on the top face
+    el("rect",{x:bx+D.w*0.47,y:by+D.h*0.76,width:D.w*0.40,height:D.h*0.15,rx:1.5,
+      fill:"#000000",opacity:".22"},gBody);
+    el("rect",{x:bx+D.w*0.47,y:by+D.h*0.76,width:D.w*0.40,height:D.h*0.15,rx:1.5,
+      fill:"none",stroke:"#ffffff","stroke-width":0.9,opacity:".14"},gBody);
+    // the dot mark, centred on the top face
+    var pitch=D.w*0.040, dr=pitch*0.31;
+    var mx=bx+D.w*0.50-1.5*pitch, my=by+D.h*0.42-2*pitch;
+    for(var i=0;i<D_SEQ.length;i++){
+      var cx=mx+D_SEQ[i][0]*pitch, cy=my+D_SEQ[i][1]*pitch, v=D_SEQ[i][1]/4;
+      el("circle",{cx:cx,cy:cy,r:dr*1.2,fill:"#000000",opacity:".6"},gBody);
+      marks.push({
+        g:el("circle",{cx:cx,cy:cy,r:dr*2.3,fill:dColor(v),filter:"url(#glow)"},gBody),
+        f:el("circle",{cx:cx,cy:cy,r:dr,fill:dColor(v)},gBody), v:v });
+    }
+  }
+
+  function build(){
+    var D=DEV[cur], M=D.modes[mode];
+    clampSlider();
+    clear(gWire); clear(gFlow); clear(gBody);
+    marks=[]; flows=[];
+
+    var bx=DX, by=CY-D.h/2, right=bx+D.w;
+    drawBody(bx,by,D);
+
+    var lineY={};          // contact id -> y
+    var groups=[];         // arrays of contact ids that carry one output's data
+
+    if(M.rj){
+      // RJ45 outputs: on the PxLNet Node, or on a Transmitter docked to the C4
+      if(M.txKit){
+        var tw=Math.round(D.w*0.36);
+        el("rect",{x:right,y:by,width:tw,height:D.h,rx:D.h*0.05,fill:"url(#case)"},gBody);
+        right+=tw;
+      }
+      var n=M.rj, span=D.h*(M.txKit?0.72:0.92), step=n>1?span/(n-1):0, y0=CY-span/2;
+      var gap=M.txKit?9:5, w=0;
+      for(var i=0;i<n;i++){
+        var cy=n===1?CY:y0+i*step;
+        w=rj45(right,cy,M.rjScale);
+        lineY["r"+i+"a"]=cy-gap/2; lineY["r"+i+"b"]=cy+gap/2;
+        groups.push(["r"+i+"a","r"+i+"b"]);
+      }
+      right+=w;
+    } else if(D.blocks){
+      // one terminal block per port; the data contact of each
+      var C=D.blocks, bh=C.pins*C.pitch+4, g=(D.h*0.9-C.count*bh)/(C.count-1);
+      var b0=CY-(C.count*bh+(C.count-1)*g)/2, bw=0;
+      for(var b=0;b<C.count;b++){
+        var r=block(right,b0+b*(bh+g)+bh/2,C.pins,C.pitch);
+        lineY["p"+b]=r.at[C.data]; groups.push(["p"+b]); bw=r.w;
+      }
+      right+=bw;
+    } else {
+      // one terminal block: every data contact is drawn, always, in the same place
+      var K=D.block, rb=block(right,CY,K.pins,K.pitch);
+      K.data.forEach(function(k){ lineY[k]=rb.at[k]; });
+      groups=M.groups.map(function(gr){ return gr.slice(); });
+      right+=rb.w;
+    }
+
+    // ---- the conductors: fixed, parallel, quiet ----
+    var used={};
+    groups.forEach(function(gr){ gr.forEach(function(k){ used[k]=1; }); });
+    Object.keys(lineY).forEach(function(k){
+      if(!used[k]) return;
+      var y=lineY[k];
+      el("path",{d:"M "+(right+3)+","+y+" L "+ENDX+","+y,fill:"none",
+        stroke:"#000000","stroke-width":1.1,opacity:".17","stroke-linecap":"round"},gWire);
+    });
+
+    // ---- the data riding on them ----
+    groups.forEach(function(gr,gi){
+      var phase=(gi*67)%DASH;
+      if(gr.length===2){
+        // a pair is one signal: a capsule spanning both conductors
+        var ya=lineY[gr[0]], yb=lineY[gr[1]], ym=(ya+yb)/2, hgt=Math.abs(yb-ya)+6;
+        var cap=el("path",{d:"M "+(right+3)+","+ym+" L "+ENDX+","+ym,fill:"none",
+          stroke:NET,"stroke-width":hgt,opacity:".13","stroke-linecap":"round",
+          "stroke-dasharray":"14 "+(DASH-14)},gFlow);
+        flows.push({e:cap,phase:phase});
+      }
+      gr.forEach(function(k){
+        var y=lineY[k];
+        var f=el("path",{d:"M "+(right+3)+","+y+" L "+ENDX+","+y,fill:"none",
+          stroke:NET,"stroke-width":1.5,opacity:".75","stroke-linecap":"round",
+          "stroke-dasharray":"14 "+(DASH-14)},gFlow);
+        flows.push({e:f,phase:phase});
+      });
+    });
+    refresh();
+  }
+
+  /* The slider never goes past what the device can carry: the highest licence
+     it is sold with, the hardware ceiling of 8 universes per port, and one
+     universe per DMX output. So "over capacity" can no longer be reached. */
+  var PORT_MAX_UNI=8;
+  /* A universe holds 170 whole RGB pixels (510 of its 512 channels), and each
+     output starts on a fresh universe. So the count is per output, rounded up. */
+  var PX_UNI=170;
+  function uniOf(M,p){ return M.outs*Math.max(1,Math.ceil(p/PX_UNI)); }
+  function maxPx(D,M){
+    var perPort=Math.min(Math.floor(D.maxUni/M.outs), PORT_MAX_UNI);
+    if(M.dmx) perPort=1;
+    return PX_UNI*perPort;
+  }
+  function clampSlider(){
+    var D=DEV[cur], M=D.modes[mode], r=document.getElementById("px"), m=maxPx(D,M);
+    r.max=m;
+    if(px>m) px=m;
+    r.value=px;
+    document.getElementById("pxv").textContent=px;
+  }
+
+  function refresh(){
+    var D=DEV[cur], M=D.modes[mode];
+    var total=px*M.outs, u=uniOf(M,px);
+    // a DMX output is one universe by definition: 512 channels, 170 RGB pixels
+    var dmxOver = M.dmx && px>170;
+    var lic = dmxOver ? null : D.lic(u);
+    nameT.textContent=D.name;
+    tagT.textContent=M.tag;
+    licT.textContent = dmxOver ? "OVER  ·  ONE UNIVERSE PER DMX OUTPUT" : (lic||"OVER CAPACITY");
+    licT.setAttribute("class", lic?"tagb":"over");
+    uniT.textContent=u+(u===1?" UNIVERSE":" UNIVERSES")+"  ·  "+total+" PIXELS";
+    gFlow.setAttribute("opacity", lic?"1":".2");
+  }
+
+  function row(host,items,onPick){
+    var box=document.getElementById(host), out=[];
+    while(box.firstChild) box.removeChild(box.firstChild);
+    items.forEach(function(s,i){
+      var b=document.createElement("button");
+      b.type="button"; b.textContent=s;
+      b.addEventListener("click",function(){ onPick(i); });
+      box.appendChild(b); out.push(b);
+    });
+    return out;
+  }
+  var devRow=row("ctlDev",ORDER.map(function(k){ return DEV[k].name.replace("DIGIDOT ",""); }),
+    function(i){
+      cur=ORDER[i];
+      if(!DEV[cur].modes[mode]) mode=DEV[cur].order[0];
+      build(); paintControls();
+    });
+  var modeRow=[];
+  function paintControls(){
+    var ord=DEV[cur].order;
+    modeRow=row("ctlMode",ord.map(function(k){ return DEV[cur].modes[k].t; }),
+      function(i){ mode=ord[i]; build(); paintControls(); });
+    devRow.forEach(function(b,i){ b.classList.toggle("on", ORDER[i]===cur); });
+    modeRow.forEach(function(b,i){ b.classList.toggle("on", ord[i]===mode); });
+    document.getElementById("ctlMode").style.visibility = ord.length>1 ? "visible" : "hidden";
+  }
+
+  function paint(t){
+    for(var i=0;i<marks.length;i++){
+      var m=marks[i], k=dBright(m.v,t);
+      m.f.setAttribute("opacity",k);
+      m.g.setAttribute("opacity",k*k*0.32);
+    }
+    for(var j=0;j<flows.length;j++){
+      var F=flows[j];
+      F.e.setAttribute("stroke-dashoffset", -((t*120 + F.phase) % DASH));
+    }
+  }
+
+  document.getElementById("px").addEventListener("input",function(){
+    px=+this.value; document.getElementById("pxv").textContent=this.value; refresh();
+  });
+
+  build(); paintControls();
+
+  var reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce){ paint(2); }
+  else{
+    var t0=null;
+    (function frame(ts){ if(t0===null) t0=ts; paint((ts-t0)/1000); requestAnimationFrame(frame); })(0);
+  }
+
+  var fitEl=document.getElementById("fit");
+  function fit(){
+    var k=Math.min(window.innerWidth/1280, window.innerHeight/720);
+    fitEl.style.transform="translate(-50%,-50%) scale("+k+")";
+  }
+  fit(); window.addEventListener("resize",fit);
+})();
+</script>
+</body>
+</html>
