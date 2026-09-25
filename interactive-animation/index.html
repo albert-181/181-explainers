@@ -131,7 +131,7 @@ input[type=range]{width:100%; accent-color:var(--fg)}
     <canvas id="cv"></canvas>
     <div class="eyebrow">Workshop model</div>
     <div class="hint">Click anything in the scene</div>
-    <div class="build">v1.2 &middot; 16 Sep 2026 16:19</div>
+    <div class="build">v1.3 &middot; 25 Sep 2026 16:03</div>
   </div>
 
   <aside class="side">
@@ -717,7 +717,7 @@ function drawScene(){
       AM = 1;
       if(standalone && netNeeded) lab("LOOPED, SYNCS PLAYBACK", SPINE, rTopY-38, "left", 0.55);
       lky = Math.min(rTopY-34, 560);
-      lab("SPI  OVER  PXLNET", ASMR+8, lky, "left");
+      lab("PXLNET", ASMR+8, lky, "left");
       lab(lines.length+" DATA LINES", ASMR+8, lky+18, "left", 0.5);
       st.hit.push({k:"link", x:ASMR+4, y:130, w:598-(ASMR+4), h:566});
     }
@@ -1193,7 +1193,7 @@ function panel(){
       b:"All 16 outputs of the Node are already PxLNet, so the pixel data leaves the rack in long distance form and nothing converts it on the way. It becomes SPI again only in the last metre, at a Transceiver beside the fixture.",
       f:[["PxLNet reach","350 m"],["Cable","CAT6 S/FTP"],["Controller end","Already PxLNet"],
          ["Transmitters","None"],["Fixture end","PxLNet Transceiver"]]};
-    else if(st.topo==="central") G={k:"Signal to the fixtures", t:"SPI over PxLNet",
+    else if(st.topo==="central") G={k:"Signal to the fixtures", t:"PxLNet",
       b:"Raw SPI is one wire referenced to ground. It starts falling apart somewhere past two or three metres, and here the controllers sit at the base of a tower. So the Transmitter is mounted straight onto the C4 and the SPI never travels as a cable at all. Everything leaving the rack is already PxLNet, and it turns back into SPI in the last metre, at a Transceiver beside the fixture.",
       f:[["Plain SPI reach","2 m"],["SPI cable here","None, direct"],["PxLNet reach","350 m"],
          ["Cable","CAT6 S/FTP"],["Controller end","PxLNet Transmitter"],
