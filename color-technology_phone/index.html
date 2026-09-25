@@ -179,7 +179,7 @@
              {id:"cw", lab:"Cool", col:K6500, k:6500, init:25}]
     },
     tw3: {
-      name:"Tunable white", count:"3 CH", tw:true, note:true,
+      name:"Tunable white", count:"3 CH", tw:true,
       spec:"Warm, neutral and cool on one three channel IC. The same white range, with the middle of the curve under its own control.",
       chans:[{id:"ww", lab:"Warm",    col:K2700, k:2700, init:70},
              {id:"nw", lab:"Neutral", col:TW3_N, k:4000, init:55},
@@ -201,7 +201,7 @@
              {id:"w", lab:"White", col:K4000.slice(), init:85}]
     },
     rgbtw: {
-      name:"RGB + TW", count:"5 CH", note:true,
+      name:"RGB + TW", count:"5 CH",
       spec:"Full color and tunable white in one pixel. The most you can ask of a fixture, and the most data per pixel.",
       chans:[{id:"r",  lab:"Red",   col:[255,0,0], init:15},
              {id:"g",  lab:"Green", col:[0,255,0], init:0},
@@ -213,7 +213,6 @@
 
   var PANELS = ["sw","tw","rgb","rgbw","rgbtw"];      // one panel per column entry
   var KEYS   = ["sw","tw2","tw3","rgb","rgbw","rgbtw"];
-  var NOTE   = "*Only available for DiGi LED Strips";
   var KELVINS = [2700, 3000, 4000, 5000];
   var KTAB = {2700:K2700, 3000:K3000, 4000:K4000, 5000:K5000};
 
@@ -313,7 +312,6 @@
               '</div>';
     });
     html += '</div>';
-    if(d.note){ html += '<div class="note">' + NOTE + '</div>'; }
     p.innerHTML = html;
 
     Array.prototype.forEach.call(p.querySelectorAll("input[type=range]"), function(s){
