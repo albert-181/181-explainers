@@ -101,6 +101,11 @@ canvas:focus-visible{outline:var(--line-w) solid currentColor;outline-offset:3px
   flex:0 0 auto;
 }
 .fact dd{font-size:clamp(12px,.92vw,16px);line-height:1.35;text-align:right}
+.box{
+  display:inline-block;width:10px;height:10px;margin-right:8px;
+  border:var(--line-w) solid currentColor;vertical-align:middle;
+}
+.box.on{background:var(--signal);border-color:var(--signal)}
 
 @media (max-width:860px){
   body{display:block;padding:18px}
@@ -147,7 +152,9 @@ var CARDS = [
       ["Refresh","40 FPS"],
       ["Distance","up to 300 m"],
       ["Devices per bus","32 max"],
-      ["Wires","2 data + ground"]
+      ["Wires","2 data + ground"],
+      ["Two-way","Yes, with RDM",true],
+      ["Fast data","No",false]
     ]
   },
   {
@@ -162,7 +169,9 @@ var CARDS = [
       ["Refresh","100 down to 20 FPS"],
       ["Distance","up to 10 m"],
       ["Addressing","position in the chain"],
-      ["Wires","1, or 2 with a clock"]
+      ["Wires","1 data + ground"],
+      ["Two-way","No",false],
+      ["Fast data","Yes",true]
     ]
   },
   {
@@ -177,7 +186,9 @@ var CARDS = [
       ["Refresh","100 down to 20 FPS"],
       ["Distance","up to 350 m"],
       ["Addressing","position in the chain"],
-      ["Wires","2 data + ground, on CAT"]
+      ["Wires","2 data + ground, on CAT"],
+      ["Two-way","Yes",true],
+      ["Fast data","Yes",true]
     ]
   }
 ];
@@ -231,7 +242,15 @@ CARDS.forEach(function(c){
     var row = document.createElement("div");
     row.className = "fact";
     var dt = document.createElement("dt"); dt.textContent = f[0];
-    var dd = document.createElement("dd"); dd.textContent = f[1];
+    var dd = document.createElement("dd");
+    if(f.length > 2){
+      var box = document.createElement("span");
+      box.className = f[2] ? "box on" : "box";
+      dd.appendChild(box);
+      dd.appendChild(document.createTextNode(f[1]));
+    } else {
+      dd.textContent = f[1];
+    }
     row.appendChild(dt); row.appendChild(dd);
     dl.appendChild(row);
   });
