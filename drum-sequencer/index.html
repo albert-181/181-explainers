@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Amstel 1 Beat Sequencer (PoC)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e7e6e1; --panel:#d6d4cd; --ink:#1d1d1b; --muted:#5c5b56; --line:#b4b2aa;
+  --pad:#c3c1b9; --padOn:#ff5a1f; --cursor:#1d1d1b; --stage:#06080b;
+  color-scheme:light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --panel:#202226; --ink:#ecebe6; --muted:#9a9993; --line:#33363b;
+    --pad:#2c2f34; --padOn:#ff5a1f; --cursor:#ecebe6; --stage:#05070a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --panel:#202226; --ink:#ecebe6; --muted:#9a9993; --line:#33363b;
+  --pad:#2c2f34; --padOn:#ff5a1f; --cursor:#ecebe6; --stage:#05070a; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 Barlow,system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+h1{font:700 30px/1.05 "Barlow Condensed",sans-serif;letter-spacing:.01em;margin:0}
+.lede{color:var(--muted);margin:4px 0 16px;max-width:70ch}
+.stage{position:relative;background:var(--stage);border-radius:6px;overflow:hidden}
+#tunnel{display:block;width:100%;height:clamp(240px,46vw,460px)}
+.mapwrap{padding:10px 12px 12px;border-top:1px solid #1b1f26}
+.mapwrap p{margin:0 0 6px;color:#8b9099;font:500 13px/1.3 Barlow,sans-serif}
+#map{display:block;width:100%;height:46px}
+.machine{margin-top:16px;background:var(--panel);border-radius:6px;padding:14px}
+.transport{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:end;margin-bottom:14px}
+.ctl{display:flex;flex-direction:column;gap:4px;font:600 14px/1 "Barlow Condensed",sans-serif;color:var(--muted)}
+.ctl output{color:var(--ink)}
+input[type=range]{width:140px;accent-color:var(--padOn)}
+select{font:500 14px Barlow,sans-serif;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 6px}
+#play{font:700 18px/1 "Barlow Condensed",sans-serif;letter-spacing:.04em;background:var(--padOn);color:#fff;border:0;border-radius:4px;padding:12px 26px;cursor:pointer;min-width:110px}
+#play[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.bar{font:700 22px/1 "Barlow Condensed",sans-serif}
+.bar small{display:block;font-size:13px;color:var(--muted);font-weight:600}
+.gridwrap{overflow-x:auto}
+.grid{display:grid;grid-template-columns:120px 92px repeat(16,minmax(30px,1fr));gap:6px;min-width:840px;align-items:center}
+.name{font:700 17px/1 "Barlow Condensed",sans-serif;display:flex;align-items:center;gap:8px}
+.name i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.name span{font:500 12px Barlow,sans-serif;color:var(--muted);display:block;margin-top:3px}
+.step{height:34px;border:0;border-radius:3px;background:var(--pad);cursor:pointer;position:relative}
+.step:nth-child(18n+7),.step:nth-child(18n+11),.step:nth-child(18n+15){margin-left:6px}
+.step[aria-pressed="true"]{background:var(--padOn)}
+.step.now{outline:2px solid var(--cursor);outline-offset:1px}
+.step:focus-visible,#play:focus-visible,select:focus-visible{outline:2px solid var(--padOn);outline-offset:2px}
+.head{font:600 12px "Barlow Condensed",sans-serif;color:var(--muted);text-align:center}
+.foot{margin-top:12px;color:var(--muted);font-size:13px;max-width:80ch}
+@media (prefers-reduced-motion:reduce){.step{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Amstel 1 beat sequencer</h1>
+  <p class="lede">Proof of concept. Each drum hit becomes light on the white roof beams. The kick sends a red pulse down the street, frame by frame.</p>
+
+  <div class="stage">
+    <canvas id="tunnel" aria-label="Schematic view down the glass street with the lit roof beams"></canvas>
+    <div class="mapwrap">
+      <p>Output map: 26 lit frames × 2 beams, the pattern that would go out as Art-Net</p>
+      <canvas id="map" aria-hidden="true"></canvas>
+    </div>
+  </div>
+
+  <section class="machine" aria-label="Sequencer">
+    <div class="transport">
+      <button id="play" aria-pressed="false">PLAY</button>
+      <label class="ctl">Tempo <output id="bpmOut">128</output> BPM
+        <input type="range" id="bpm" min="70" max="170" value="128"></label>
+      <label class="ctl">Kick travel time
+        <select id="travel"><option value="2">½ beat</option><option value="4" selected>1 beat</option><option value="8">2 beats</option><option value="16">1 bar</option></select></label>
+      <label class="ctl">Kick direction
+        <select id="dir"><option value="fwd">Frame 1 to far end</option><option value="back">Far end to frame 1</option><option value="mid">From the middle out</option></select></label>
+      <label class="ctl">Volume
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="0.7"></label>
+      <div class="bar"><span id="barNum">1</span><small>bar</small></div>
+    </div>
+    <div class="gridwrap"><div class="grid" id="grid"></div></div>
+    <p class="foot">Set a track to fire every 2, 4 or 8 bars to place a kick only on that bar. Sound is synthesised in the browser, it is not a sample of any real machine. Schematic only, not to scale for photometry.</p>
+  </section>
+</main>
+
+<script>
+/* ---------- tracks ---------- */
+const TRACKS=[
+  {id:'bd',name:'Kick',fx:'Red pulse travels along the street',col:[1,0.08,0.06],steps:[0,4,8,12]},
+  {id:'sd',name:'Snare',fx:'White flash, all beams',col:[1,1,1],steps:[4,12]},
+  {id:'cp',name:'Clap',fx:'Amber, alternating side',col:[1,0.62,0.1],steps:[]},
+  {id:'ch',name:'Closed hat',fx:'Cyan sparkle, random frames',col:[0.2,0.8,1],steps:[2,6,10,14]},
+  {id:'oh',name:'Open hat',fx:'Violet wave, far end back',col:[0.55,0.4,1],steps:[]},
+];
+TRACKS.forEach(t=>{t.on=new Array(16).fill(false);t.steps.forEach(s=>t.on[s]=true);t.every=1;});
+
+const grid=document.getElementById('grid');
+grid.insertAdjacentHTML('beforeend','<div></div><div class="head">Every</div>'+Array.from({length:16},(_,i)=>`<div class="head">${i+1}</div>`).join(''));
+const stepEls=[];
+TRACKS.forEach((t,ti)=>{
+  const c=`rgb(${t.col.map(v=>Math.round(v*255)).join(',')})`;
+  const nm=document.createElement('div');nm.className='name';
+  nm.innerHTML=`<i style="background:${c}"></i><div>${t.name}<span>${t.fx}</span></div>`;grid.appendChild(nm);
+  const sel=document.createElement('select');sel.setAttribute('aria-label',t.name+' every N bars');
+  [1,2,4,8].forEach(n=>sel.insertAdjacentHTML('beforeend',`<option value="${n}">${n===1?'every bar':n+' bars'}</option>`));
+  sel.onchange=()=>t.every=+sel.value;grid.appendChild(sel);
+  stepEls[ti]=[];
+  for(let s=0;s<16;s++){
+    const b=document.createElement('button');b.className='step';b.setAttribute('aria-label',`${t.name} step ${s+1}`);
+    b.setAttribute('aria-pressed',t.on[s]);b.onclick=()=>{t.on[s]=!t.on[s];b.setAttribute('aria-pressed',t.on[s]);};
+    grid.appendChild(b);stepEls[ti][s]=b;
+  }
+});
+
+/* ---------- audio ---------- */
+let ac=null,master=null,noiseBuf=null,ohGain=null;
+function initAudio(){
+  ac=new (window.AudioContext||window.webkitAudioContext)();
+  master=ac.createGain();master.gain.value=+vol.value;master.connect(ac.destination);
+  noiseBuf=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);
+  const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+}
+function noise(t,dur,type,freq,level,q){
+  const s=ac.createBufferSource();s.buffer=noiseBuf;
+  const f=ac.createBiquadFilter();f.type=type;f.frequency.value=freq;if(q)f.Q.value=q;
+  const g=ac.createGain();s.connect(f);f.connect(g);g.connect(master);
+  s.start(t);s.stop(t+dur+0.05);return g;
+}
+function env(g,t,level,dur){g.gain.setValueAtTime(level,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);}
+const VOICE={
+  bd(t){const o=ac.createOscillator(),g=ac.createGain();o.type='sine';
+    o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(48,t+0.13);
+    o.connect(g);g.connect(master);env(g,t,1,0.55);o.start(t);o.stop(t+0.6);
+    const c=noise(t,0.01,'highpass',2000);env(c,t,0.25,0.012);},
+  sd(t){const n=noise(t,0.2,'highpass',1200);env(n,t,0.5,0.2);
+    const o=ac.createOscillator(),g=ac.createGain();o.type='triangle';o.frequency.setValueAtTime(190,t);
+    o.connect(g);g.connect(master);env(g,t,0.5,0.1);o.start(t);o.stop(t+0.15);},
+  cp(t){const n=noise(t,0.3,'bandpass',1400,0,1.2);
+    [0,0.011,0.022].forEach(d=>{n.gain.setValueAtTime(0.8,t+d);n.gain.exponentialRampToValueAtTime(0.1,t+d+0.009);});
+    n.gain.setValueAtTime(0.7,t+0.033);n.gain.exponentialRampToValueAtTime(0.001,t+0.22);},
+  ch(t){if(ohGain){ohGain.gain.cancelScheduledValues(t);ohGain.gain.setValueAtTime(0.2,t);ohGain.gain.exponentialRampToValueAtTime(0.001,t+0.02);}
+    const n=noise(t,0.06,'highpass',7500);env(n,t,0.35,0.05);},
+  oh(t){const n=noise(t,0.4,'highpass',7000);env(n,t,0.3,0.35);ohGain=n;},
+};
+
+/* ---------- scheduler ---------- */
+let playing=false,step=0,bar=0,nextT=0,timer=null;const events=[];
+const bpmEl=document.getElementById('bpm'),vol=document.getElementById('vol');
+bpmEl.oninput=()=>document.getElementById('bpmOut').textContent=bpmEl.value;
+vol.oninput=()=>{if(master)master.gain.value=+vol.value;};
+const stepDur=()=>60/+bpmEl.value/4;
+function schedule(){
+  while(nextT<ac.currentTime+0.12){
+    TRACKS.forEach(t=>{if(t.on[step]&&bar%t.every===0){VOICE[t.id](nextT);events.push({t:nextT,k:t.id});}});
+    events.push({t:nextT,k:'ui',step,bar});
+    nextT+=stepDur();step++;if(step===16){step=0;bar++;}
+  }
+}
+document.getElementById('play').onclick=e=>{
+  if(!ac)initAudio();ac.resume();
+  playing=!playing;e.currentTarget.setAttribute('aria-pressed',playing);e.currentTarget.textContent=playing?'STOP':'PLAY';
+  if(playing){step=0;bar=0;nextT=ac.currentTime+0.06;timer=setInterval(schedule,25);schedule();}
+  else{clearInterval(timer);events.length=0;markStep(-1);}
+};
+let lastUi=-1;
+function markStep(s){stepEls.forEach(r=>r.forEach((b,i)=>b.classList.toggle('now',i===s)));}
+
+/* ---------- light model ---------- */
+// Geometry from the Amstel 1 ALF simulator defaults: 51 frames at 1.25 m, 7 m wide, eave 3.5 m, ridge 5.7 m, every 2nd frame lit.
+const FRAMES=51,SP=1.25,HALF=3.5,EAVE=3.5,RIDGE=5.7,LIT=[];
+for(let i=0;i<FRAMES;i+=2)LIT.push(i);
+const NL=LIT.length; // 26
+const beams=Array.from({length:NL},()=>[[0,0,0],[0,0,0]]); // [frame][side L,R][rgb]
+const waves=[];
+function add(j,side,col,a){const b=beams[j][side];for(let c=0;c<3;c++)b[c]=Math.min(1.4,b[c]+col[c]*a);}
+let clapSide=0;
+function fire(k,t){
+  const tr=TRACKS.find(x=>x.id===k);
+  if(k==='bd'){const dir=document.getElementById('dir').value;const dur=+document.getElementById('travel').value*stepDur();
+    if(dir==='mid'){waves.push({t0:t,dur,col:tr.col,from:(NL-1)/2,to:-0.5,passed:new Set()},{t0:t,dur,col:tr.col,from:(NL-1)/2,to:NL-0.5,passed:new Set()});}
+    else waves.push({t0:t,dur,col:tr.col,from:dir==='fwd'?-0.5:NL-0.5,to:dir==='fwd'?NL-0.5:-0.5,passed:new Set()});}
+  else if(k==='sd'){for(let j=0;j<NL;j++){add(j,0,tr.col,0.75);add(j,1,tr.col,0.75);}}
+  else if(k==='cp'){for(let j=0;j<NL;j++)add(j,clapSide,tr.col,1);clapSide^=1;}
+  else if(k==='ch'){for(let n=0;n<3;n++)add(Math.floor(Math.random()*NL),Math.random()<0.5?0:1,tr.col,1);}
+  else if(k==='oh'){waves.push({t0:t,dur:stepDur()*6,col:tr.col,from:NL-0.5,to:-0.5,passed:new Set(),soft:true});}
+}
+function updateLights(now,dt){
+  const k=Math.exp(-dt/0.16);
+  beams.forEach(f=>f.forEach(b=>{for(let c=0;c<3;c++)b[c]*=k;}));
+  for(let w=waves.length-1;w>=0;w--){const v=waves[w];const p=Math.min(1,(now-v.t0)/v.dur);const pos=v.from+(v.to-v.from)*p;
+    for(let j=0;j<NL;j++){if(!v.passed.has(j)&&((v.to>v.from&&pos>=j)||(v.to<v.from&&pos<=j))){v.passed.add(j);add(j,0,v.col,v.soft?0.7:1.2);add(j,1,v.col,v.soft?0.7:1.2);}}
+    if(p>=1)waves.splice(w,1);}
+}
+
+/* ---------- drawing ---------- */
+const cv=document.getElementById('tunnel'),cx=cv.getContext('2d'),mv=document.getElementById('map'),mx=mv.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){DPR=Math.min(2,window.devicePixelRatio||1);
+  W=cv.clientWidth;H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;cx.setTransform(DPR,0,0,DPR,0,0);
+  mv.width=mv.clientWidth*DPR;mv.height=mv.clientHeight*DPR;mx.setTransform(DPR,0,0,DPR,0,0);}
+window.addEventListener('resize',resize);resize();
+const EYE=1.6,Z0=3.2;
+function proj(x,y,z){const f=Math.min((W/2*0.92)*Z0/HALF,(H*0.56)*Z0/(RIDGE-EYE));const hy=H*0.6;return[W/2+x*f/z,hy-(y-EYE)*f/z];}
+const rgb=(c,a)=>`rgba(${Math.round(Math.min(1,c[0])*255)},${Math.round(Math.min(1,c[1])*255)},${Math.round(Math.min(1,c[2])*255)},${a})`;
+function line(a,b,style,w){cx.strokeStyle=style;cx.lineWidth=w;cx.beginPath();cx.moveTo(a[0],a[1]);cx.lineTo(b[0],b[1]);cx.stroke();}
+function draw(){
+  cx.globalCompositeOperation='source-over';cx.fillStyle='#06080b';cx.fillRect(0,0,W,H);
+  const zOf=i=>Z0+i*SP, zEnd=zOf(FRAMES-1);
+  // long lines: floor edges, eaves, ridge
+  [[-HALF,0],[HALF,0],[-HALF,EAVE],[HALF,EAVE],[0,RIDGE]].forEach(([x,y])=>line(proj(x,y,Z0),proj(x,y,zEnd),'#1c222b',1));
+  for(let i=FRAMES-1;i>=0;i--){
+    const z=zOf(i),s=Z0/z,lit=i%2===0?LIT.indexOf(i):-1;
+    const fl=proj(-HALF,0,z),fr=proj(HALF,0,z),el=proj(-HALF,EAVE,z),er=proj(HALF,EAVE,z),r=proj(0,RIDGE,z);
+    const base='#3a414b',w=Math.max(0.6,3*s);
+    line(fl,el,'#232931',w*0.8);line(fr,er,'#232931',w*0.8);
+    line(el,r,base,w);line(er,r,base,w);
+    if(lit>=0){
+      cx.globalCompositeOperation='lighter';
+      [[el,0],[er,1]].forEach(([e,side])=>{const c=beams[lit][side],m=Math.max(c[0],c[1],c[2]);
+        if(m>0.02){const g=cx.createLinearGradient(e[0],e[1],r[0],r[1]);g.addColorStop(0,rgb(c,Math.min(1,m)));g.addColorStop(1,rgb(c,0.05));
+          line(e,r,g,w*4.5);line(e,r,g,w*1.6);}
+        cx.fillStyle=m>0.02?rgb(c,1):'#59616c';cx.beginPath();cx.arc(e[0]+(side?-1:1)*w,e[1]+w*0.6,Math.max(1,2.4*s),0,7);cx.fill();});
+      cx.globalCompositeOperation='source-over';
+    }
+  }
+  // map
+  const mw=mv.clientWidth,mh=mv.clientHeight,cw=mw/NL,rh=mh/2;
+  mx.fillStyle='#06080b';mx.fillRect(0,0,mw,mh);
+  for(let j=0;j<NL;j++)for(let s=0;s<2;s++){const c=beams[j][s];mx.fillStyle=Math.max(...c)>0.02?rgb(c,1):'#161b22';mx.fillRect(j*cw+1,s*rh+1,cw-2,rh-2);}
+}
+let last=performance.now();
+function loop(n){const dt=Math.min(0.1,(n-last)/1000);last=n;
+  if(ac&&playing){const now=ac.currentTime;
+    while(events.length&&events[0].t<=now){const e=events.shift();
+      if(e.k==='ui'){markStep(e.step);document.getElementById('barNum').textContent=e.bar+1;}else fire(e.k,e.t);}
+    updateLights(now,dt);}
+  else{beams.forEach(f=>f.forEach(b=>{for(let c=0;c<3;c++)b[c]*=Math.exp(-dt/0.16);}));}
+  draw();requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
