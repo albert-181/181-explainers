@@ -46,12 +46,26 @@ select{font:500 14px Barlow,sans-serif;background:var(--bg);color:var(--ink);bor
 .bar{font:700 22px/1 "Barlow Condensed",sans-serif}
 .bar small{display:block;font-size:13px;color:var(--muted);font-weight:600}
 .gridwrap{overflow-x:auto}
-.grid{display:grid;grid-template-columns:120px 92px repeat(16,minmax(30px,1fr));gap:6px;min-width:840px;align-items:center}
+.grid{display:grid;grid-template-columns:120px 92px repeat(16,minmax(30px,1fr)) 34px;gap:6px;min-width:880px;align-items:center}
+.clr{height:34px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:3px;cursor:pointer;font:600 16px/1 Barlow,sans-serif}
+.clr:hover,.clr:focus-visible{color:var(--ink);border-color:var(--ink)}
+.mem{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.mem h2{font:700 17px/1 "Barlow Condensed",sans-serif;margin:0 0 4px}
+.mem p{margin:0 0 10px;color:var(--muted);font-size:13px}
+.slots{display:grid;grid-template-columns:repeat(8,minmax(64px,1fr));gap:8px;overflow-x:auto}
+.slot{position:relative}
+.slot .load{width:100%;height:48px;border:1px dashed var(--line);background:transparent;color:var(--muted);border-radius:4px;cursor:pointer;font:700 18px/1 "Barlow Condensed",sans-serif}
+.slot.full .load{border:0;background:var(--pad);color:var(--ink)}
+.slot.active .load{background:var(--padOn);color:#fff}
+.slot .load small{display:block;font:500 11px Barlow,sans-serif;margin-top:3px}
+.slot .x{position:absolute;top:3px;right:3px;width:20px;height:20px;border:0;border-radius:3px;background:rgba(0,0,0,.25);color:#fff;cursor:pointer;font:600 13px/20px Barlow,sans-serif;padding:0;display:none}
+.slot.full .x{display:block}
+.slot button:focus-visible,.clr:focus-visible{outline:2px solid var(--padOn);outline-offset:2px}
 .name{font:700 17px/1 "Barlow Condensed",sans-serif;display:flex;align-items:center;gap:8px}
 .name i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .name span{font:500 12px Barlow,sans-serif;color:var(--muted);display:block;margin-top:3px}
 .step{height:34px;border:0;border-radius:3px;background:var(--pad);cursor:pointer;position:relative}
-.step:nth-child(18n+7),.step:nth-child(18n+11),.step:nth-child(18n+15){margin-left:6px}
+.step:nth-child(19n+7),.step:nth-child(19n+11),.step:nth-child(19n+15){margin-left:6px}
 .step[aria-pressed="true"]{background:var(--padOn)}
 .step.now{outline:2px solid var(--cursor);outline-offset:1px}
 .step:focus-visible,#play:focus-visible,select:focus-visible{outline:2px solid var(--padOn);outline-offset:2px}
@@ -87,6 +101,11 @@ select{font:500 14px Barlow,sans-serif;background:var(--bg);color:var(--ink);bor
       <div class="bar"><span id="barNum">1</span><small>bar</small></div>
     </div>
     <div class="gridwrap"><div class="grid" id="grid"></div></div>
+    <div class="mem">
+      <h2>Pattern memories</h2>
+      <p>Click an empty slot to store the current pattern, click a stored slot to recall it, X to clear it.</p>
+      <div class="slots" id="slots"></div>
+    </div>
     <p class="foot">Set a track to fire every 2, 4 or 8 bars to place a kick only on that bar. Sound is synthesised in the browser, it is not a sample of any real machine. Schematic only, not to scale for photometry.</p>
   </section>
 </main>
@@ -103,7 +122,7 @@ const TRACKS=[
 TRACKS.forEach(t=>{t.on=new Array(16).fill(false);t.steps.forEach(s=>t.on[s]=true);t.every=1;});
 
 const grid=document.getElementById('grid');
-grid.insertAdjacentHTML('beforeend','<div></div><div class="head">Every</div>'+Array.from({length:16},(_,i)=>`<div class="head">${i+1}</div>`).join(''));
+grid.insertAdjacentHTML('beforeend','<div></div><div class="head">Every</div>'+Array.from({length:16},(_,i)=>`<div class="head">${i+1}</div>`).join('')+'<div class="head">Clear</div>');
 const stepEls=[];
 TRACKS.forEach((t,ti)=>{
   const c=`rgb(${t.col.map(v=>Math.round(v*255)).join(',')})`;
@@ -111,14 +130,45 @@ TRACKS.forEach((t,ti)=>{
   nm.innerHTML=`<i style="background:${c}"></i><div>${t.name}<span>${t.fx}</span></div>`;grid.appendChild(nm);
   const sel=document.createElement('select');sel.setAttribute('aria-label',t.name+' every N bars');
   [1,2,4,8].forEach(n=>sel.insertAdjacentHTML('beforeend',`<option value="${n}">${n===1?'every bar':n+' bars'}</option>`));
-  sel.onchange=()=>t.every=+sel.value;grid.appendChild(sel);
+  sel.onchange=()=>t.every=+sel.value;grid.appendChild(sel);t.sel=sel;
   stepEls[ti]=[];
   for(let s=0;s<16;s++){
     const b=document.createElement('button');b.className='step';b.setAttribute('aria-label',`${t.name} step ${s+1}`);
     b.setAttribute('aria-pressed',t.on[s]);b.onclick=()=>{t.on[s]=!t.on[s];b.setAttribute('aria-pressed',t.on[s]);};
     grid.appendChild(b);stepEls[ti][s]=b;
   }
+  const x=document.createElement('button');x.className='clr';x.textContent='×';x.setAttribute('aria-label','Clear all '+t.name+' steps');
+  x.onclick=()=>{t.on.fill(false);stepEls[ti].forEach(b=>b.setAttribute('aria-pressed','false'));};
+  grid.appendChild(x);
 });
+
+/* ---------- pattern memories ---------- */
+const MEMKEY='amstel1-seq-memories';
+let mems=new Array(8).fill(null),activeMem=-1;
+try{const s=JSON.parse(localStorage.getItem(MEMKEY)||'null');if(Array.isArray(s)&&s.length===8)mems=s;}catch(e){}
+function saveMems(){try{localStorage.setItem(MEMKEY,JSON.stringify(mems));}catch(e){}}
+function snapshot(){return{tracks:TRACKS.map(t=>({id:t.id,on:t.on.slice(),every:t.every})),bpm:+document.getElementById('bpm').value,travel:document.getElementById('travel').value,dir:document.getElementById('dir').value};}
+function recall(m){
+  m.tracks.forEach(s=>{const ti=TRACKS.findIndex(t=>t.id===s.id);if(ti<0)return;const t=TRACKS[ti];
+    t.on=s.on.slice();t.every=s.every;t.sel.value=s.every;stepEls[ti].forEach((b,i)=>b.setAttribute('aria-pressed',t.on[i]));});
+  const bpm=document.getElementById('bpm');bpm.value=m.bpm;document.getElementById('bpmOut').textContent=m.bpm;
+  document.getElementById('travel').value=m.travel;document.getElementById('dir').value=m.dir;
+}
+const slotsEl=document.getElementById('slots');
+function renderSlots(){
+  slotsEl.innerHTML='';
+  mems.forEach((m,i)=>{
+    const d=document.createElement('div');d.className='slot'+(m?' full':'')+(i===activeMem?' active':'');
+    const b=document.createElement('button');b.className='load';
+    b.innerHTML=`${i+1}<small>${m?m.bpm+' BPM':'Save'}</small>`;
+    b.setAttribute('aria-label',m?`Recall memory ${i+1}`:`Store current pattern in memory ${i+1}`);
+    b.onclick=()=>{if(m){recall(m);activeMem=i;}else{mems[i]=snapshot();activeMem=i;saveMems();}renderSlots();};
+    const x=document.createElement('button');x.className='x';x.textContent='×';x.setAttribute('aria-label',`Clear memory ${i+1}`);
+    x.onclick=e=>{e.stopPropagation();mems[i]=null;if(activeMem===i)activeMem=-1;saveMems();renderSlots();};
+    d.append(b,x);slotsEl.appendChild(d);
+  });
+}
+renderSlots();
 
 /* ---------- audio ---------- */
 let ac=null,master=null,noiseBuf=null,ohGain=null;
