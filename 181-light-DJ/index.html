@@ -922,7 +922,7 @@ function draw(){const ls=song.sections[lightSec]||sel(),I=ls.light.int;
   const mw=mv.clientWidth,mh=mv.clientHeight,cw=mw/NL,rh=mh/2;mx.fillStyle='#000';mx.fillRect(0,0,mw,mh);
   for(let j=0;j<NL;j++)for(let s=0;s<2;s++){const c=beams[j][s];mx.fillStyle=Math.max(...c)*I>.02?rgba(c,1,I):'#121216';mx.fillRect(j*cw+1,s*rh+1,cw-2,rh-2);}
 }
-let last=performance.now(),followSel=false;
+let last=performance.now(),followSel=true;
 function loop(n){const dt=Math.min(.1,(n-last)/1000);last=n;
   if(ac&&playing){const now=ac.currentTime;let ui=null;
     while(events.length&&events[0].t<=now){const e=events.shift();if(e.k==='ui')ui=e;else fire(e);}
